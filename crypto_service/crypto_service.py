@@ -61,16 +61,9 @@ class FileHandler:
                 f.write(data)
         
         
+Keys = Enum('Keys', ['OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN', 'REDIS_ENCRYPTION'])
 
-class Keys(Enum):
-    OAUTH_CREDENTIALS = 'key_oauth'
-    JWT_TOKEN = 'key_jwt'
-    REFRESH_TOKEN = 'key_refresh'
-    REDIS_ENCRYPTION = 'fernet'
-
-class KeyTypes(Enum):
-    ASYMMETRIC = "ES256K"
-    SYMMETRIC = "Fernet"
+KeyTypes = Enum('KeyTypes', ['ASYMMETRIC', 'SYMMETRIC'])
 
 class CryptoUtils:
     secrets_folder = 'secrets/'
