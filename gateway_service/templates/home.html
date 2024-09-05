@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Sync</title>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <div class="container-fluid bg-primary">
+        <div class="navbar">
+            <div class="navbar-brand text-light fw-bold fs-2">
+                <img class = "img-fluid" src="../static/calendar_nav.png" alt="calendar">
+                    Calendar Sync
+            </div>
+            <button id="login" type="button" class="btn  btn-light" onclick="">
+                Login
+            </button>
+        </div>    
+    </div>
+ 
+    <div class="container-fluid">
+        <!--Sync your calendar-->
+        <div class="row" style="height:50vh ;">
+            <div class="col-sm col-md ">
+                <div class="row">
+                    <p class="fs-1 fw-bold ">
+                        Seamless Integration with Google Calendar
+                    </p>
+                </div>
+                <div class="row h-auto">
+                    <p class="fs-5 fw-lighter ">
+                        Our app makes it simple to plan your activities in an Excel spreadsheet and automatically sync them to your Google Calendar.
+                    </p>
+                </div>
+            </div>
+            <div class="col-sm col-md d-none d-md-block">
+                <div class="container-fluid d-flex justify-content-end">
+                   <img class="img-fluid rounded-circle p-3" src="../static/fotor-ai-2024071923101.jpg" style="height:50vh"> 
+                </div>
+            </div>
+        </div>
+        
+        <!--Process-->
+        <div class="row process" style="height:36vh ;">
+            <div class="col-md">
+               <div class="row"> 
+                   <img class="img-fluid p-3" src="../static/icons8-download-64.png"> 
+               </div>
+               <div class="row">
+                <p class="fs-4 fw-bold">
+                    Download Template
+                </p>
+                <p class="fw-lighter">
+                    Start by downloading our Excel template to plan your events.
+                </p>
+               </div> 
+            </div> 
+            <div class="col-md process">
+                <div class="row">
+                    <img class="img-fluid " src="../static/icons8-upload-64.png"> 
+                </div>
+                <div class="row">
+                    <p class="fs-4 fw-bold">
+                        Upload Spreadsheet
+                    </p>
+                    <p class="fw-lighter">
+                        Fill out the template and upload it to our app.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md process">
+                <div class="row">
+                    <img class="img-fluid p-3" src="../static/icons8-calendar-64.png">
+                </div>
+                <div class="row">
+                    <p class="fs-4 fw-bold">
+                        Sync to Calendar
+                    </p>
+                    <p class="fw-lighter">
+                        We'll automatically add your events to your Google Calendar.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!--More Info-->
+        <div class="row">
+
+        </div>
+
+        <!--Footer-->
+        <div class="row">
+
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        document.getElementById("login").onclick = function () {
+            location.href = "http://127.0.0.1:8080/login";
+        };
+    </script> 
+</body>
+</html>

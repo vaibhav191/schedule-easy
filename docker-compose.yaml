@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  
+  mongo:
+    image: mongo:7.0.2
+    container_name: mongodb
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo-data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+  crypto_service:
+    image: crypto_service
+    build:
+      context: ./crypto_service
+      dockerfile: Dockerfile
+    ports:
+      - '7070:7070'
+    environment:
+      - CRYPTO_SERVICE=7070
+
+volumes:
+  redis-data:
+    driver: local
+  mongo-data:
+    driver: local

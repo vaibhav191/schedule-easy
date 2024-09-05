@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/style.css') }}">
+    <title>Calendar Sync</title>
+</head>
+<body>
+    <!-- Navbar -->
+    <div class="container-fluid bg-primary">
+        <div class="navbar">
+            <div class="navbar-brand text-light fw-bold fs-2">
+                <img class = "img-fluid" src="../static/calendar_nav.png" alt="calendar">
+                    Calendar Sync
+            </div>
+            <button id="login" type="button" class="btn  btn-light" onclick="">
+                {%for item in data%}
+                    {{item.email}}
+                {% endfor %}
+            </button>
+        </div>    
+    </div>
+    <div class="container-fluid">
+        <div class="container-fluid">
+            <!--Download-->
+            <div class="row  align-items-end" style="height: 30vh;">
+                <ul class="list-unstyled">
+                    <li class="fs-2 fw-bold">Download Excel Template</li>
+                    <li class="fs-5 fw-lighter">
+                        Download our pre-formatted Excel template to easily plan your activities.
+                    </li>
+                    <li>
+                        <form method="get" action="/download">
+                            <button type="submit" id="download" type="button" class="btn  btn-primary" onclick="">
+                                Download
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+            <!--Upload-->
+            <div class="row  align-items-end" style="height: 30vh;">
+                <ul class="list-unstyled">
+                    <li class="fs-2 fw-bold">Upload your Plans</li>
+                    <li class="fs-5 fw-lighter">
+                        Once you've filled in the Excel template with your activity details, upload it here to sync with your Google Calendar.
+                    </li>
+                    <form enctype = "multipart/form-data" id="uploadForm">
+                    <li>
+                        <div class="mb-3">
+                            <label for="formFileSm" class="form-label"></label>
+                            <input class="form-control form-control-sm" id="formFileSm" type="file" name="file">
+                        </div>
+                    </li>
+                    <li>
+                        <button type="submit" value="Submit" id="upload" type="button" class="btn  btn-primary" onclick="">
+                            Create Events on Calendar
+                        </button>
+                    </li>
+                    </form>
+                    <!--Run
+                    <li class="align-items-end">
+                        <p class="text-end">
+                            <button id="run" type="button" class="btn  btn-primary" onclick="">
+                                Create Events on Calendar
+                            </button>
+                        </p>
+                    </li>
+                    -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function (event) {
+            event.preventDefault(); // Prevent default form submission
+            const formData = new FormData(this); // Create FormData object
+            const fileInput = document.getElementById('formFileSm');
+            try {
+                if (!fileInput.files.length){
+                    alert('Please select a file.');
+                    event.preventDefault();
+                    throw new Error("No file selected");
+                }
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+    
+                if (response.ok) {
+                    // Handle success (e.g., display a success message)
+                    alert("File uploaded successfully!");
+                    console.log('File uploaded successfully!');
+                } 
+                else {
+                    if (response.status==400){
+                        alert("Ensure file is '.xlsx' or '.xls' and file size < 2MB");
+                        console.error("File type and size error");
+                    }
+                    // Handle error (e.g., display an error message)
+                    else{
+                        alert("Error, try again later.");
+                    console.error('Error uploading file.');
+                    }
+                }
+            } catch (error) {
+                console.error('An error occurred:', error);
+            }
+        });
+    </script>
+</body>
+</html>
