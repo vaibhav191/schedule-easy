@@ -27,6 +27,8 @@ services:
       - '6379:6379'
     volumes:
       - redis-data:/data
+
+# To do: Ensure all crypto_service share the same volume or use AWS KMS to fetch key
   crypto_service:
     image: crypto_service
     build:
