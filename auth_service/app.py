@@ -113,6 +113,7 @@ class Scopes(Enum):
     FULL_CALENDAR = "https://www.googleapis.com/auth/calendar"
     FULL_EVENTS = "https://www.googleapis.com/auth/calendar.events"
 
+#remove reader if not needed
 class Reader:
     @staticmethod
     def from_json(path: str, key: str) -> Union[str, Dict[str, str]]:
@@ -128,6 +129,7 @@ class Reader:
             data = f.reads()
         return data
 
+# read port from environment variable. set env variable in docker compose.
 class MongoDBHandler:
     address = 'mongodb://127.0.0.1'
     port = '27017'
@@ -142,19 +144,20 @@ class MongoDBHandler:
         collection: Collection = db[collection_name]
         return collection
 
-    # To Do: implement encryption if data is sensitive. Use Asymm encryption. Request the Key from CryptoUtils
+# need to convert data into json so we can insert all kinds of data without having to check for types or use different insert functions.
     @staticmethod
     def insert_one(collection: Collection, data: Dict[str, Any], sensitive: bool = False) -> InsertOneResult:
         post = data
         post['last-update'] = datetime.datetime.now(tz = datetime.UTC)
         post_id = collection.insert_one(post).insert_id
         return post_id
-    
-    # decrypt if needed
+
+# similarly convert fetched json and use json.loads to convert into python object.
     @staticmethod
     def fetch_one():
         pass
 
+# Implementation needed. Use JWT library to encrypt? Do not send sensitive details. Save in cookie httponly.
 class JWTHandler:
     @staticmethod
     def create_jwt_token():
@@ -167,6 +170,7 @@ class JWTHandler:
     def validate_refresh_token():
         pass
 
+# what else do we need it for except login? maybe some active session details?
 class RedisHandler:
     def __init__(self) -> None:
         self.host = 'localhost'
@@ -215,6 +219,7 @@ class GcpService:
 
         return email
 
+# Must implement AWS KMS for CLIENT secrets file before creating docker image.
 class CredsGenerator:
     CLIENT_SECRETS_FILE = '../secrets/credentials.json'
     def __init__(self, scopes: List) -> None:
@@ -256,12 +261,14 @@ class CredsGenerator:
 # ENVIRONMENT VARIABLES
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # used to ensure oauthlib can operate without https
 
+# change mechanism/file, use AWS KMS
 CLIENT_SECRETS_FILE = "../credentials.json"
 
 # flask
 app = Flask(__name__)
 app.secret_key = Reader.from_json("../secrets.json", 'session_secret')
 
+# change unique_id to session_id
 @app.route('/')
 def home():
     unique_id = request.cookies.get('unique_id')
@@ -273,9 +280,6 @@ def home():
     
     return Response(f"OK {data.get('email')}", 200)
 
-#let's make it so that instead of calling oauth2callback, we call unique oauth2callback/uuid
-#this way we can use uuid to set up requesturl and state in the redis
-#once we are in that unique oauth2callback, we take the uuid and get the requesturl and state from redis
 @app.route('/login')
 def login():
     scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value]
@@ -291,7 +295,7 @@ def login():
     authorization_url = credgen.authorization_url
     return redirect(authorization_url)
 
-# once we have the credentials and email, store it in MongoDB
+# once we have the credentials and email, store it in MongoDB after encryption of credentials using pub key
 @app.route('/oauth2callback/<unique_id>')
 def callback(unique_id):
     print("oauth2callback with unique id: ", str(unique_id))
@@ -303,6 +307,8 @@ def callback(unique_id):
     request_url = data.get('request_url') 
 
     credgen = CredsGenerator(scope)
+    # To Do: implement encryption if data is sensitive. Use Asymm encryption. Request the Key from CryptoUtils.
+    #       Then store in mongodb the necessary user details
     credentials = credgen.callback(state= state, unique_id= unique_id)
 
     if not credentials.valid:
