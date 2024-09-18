@@ -105,6 +105,7 @@ from pymongo.collection import Collection
 from pymongo.results import InsertOneResult
 import datetime
 import urllib
+import boto3
 import uuid
 
 class Scopes(Enum): 
@@ -219,6 +220,26 @@ class GcpService:
 
         return email
 
+# AWS KMS
+class KMSHandler:
+    def __init__(self) -> None:
+        self.access_key = Reader.from_json("../secrets/key_manager.json", 'AccessKey')
+        self.secret_key = Reader.from_json("../secrets/key_manager.json", 'Secret')
+        self.region = Reader.from_json("../secrets/key_manager.json", 'Region')
+        self.client = boto3.client('kms', region_name = self.region, aws_access_key_id = self.access_key, aws_secret_access_key = self.secret_key)
+
+    def encrypt(self, data: bytes) -> bytes:
+        resp = self.client.encrypt(KeyId = '290f9ecc-878a-4a18-be3b-6b1039a8ea6d', Plaintext = data, EncryptionContext = {'context': 'auth_cred'})
+        if 'CiphertextBlob' in resp:
+            return resp['CiphertextBlob']
+        return None
+
+    def decrypt(self, data: bytes) -> bytes:
+        resp = self.client.decrypt(CiphertextBlob = data, KeyId = '290f9ecc-878a-4a18-be3b-6b1039a8ea6d', EncryptionContext = {'context': 'auth_cred'})
+        if 'Plaintext' in resp:
+            return resp['Plaintext']
+        return None
+
 # Must implement AWS KMS for CLIENT secrets file before creating docker image.
 class CredsGenerator:
     CLIENT_SECRETS_FILE = '../secrets/credentials.json'
@@ -266,7 +287,7 @@ CLIENT_SECRETS_FILE = "../credentials.json"
 
 # flask
 app = Flask(__name__)
-app.secret_key = Reader.from_json("../secrets.json", 'session_secret')
+app.secret_key = Reader.from_json("../secrets/secrets.json", 'session_secret')
 
 # change unique_id to session_id
 @app.route('/')
