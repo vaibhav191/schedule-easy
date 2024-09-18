@@ -86,6 +86,9 @@ To Do:
 
 '''
 
+# we will continue to use crypto service since encrypting and decrypting data with AWS KMS alone can be very costly and time consuming
+# due to the number of requests and network latency.
+
 from enum import Enum
 from flask import Flask, redirect, request, Response, url_for, session, make_response
 import requests
@@ -114,7 +117,6 @@ class Scopes(Enum):
     FULL_CALENDAR = "https://www.googleapis.com/auth/calendar"
     FULL_EVENTS = "https://www.googleapis.com/auth/calendar.events"
 
-#remove reader if not needed
 class Reader:
     @staticmethod
     def from_json(path: str, key: str) -> Union[str, Dict[str, str]]:
@@ -150,13 +152,16 @@ class MongoDBHandler:
     def insert_one(collection: Collection, data: Dict[str, Any], sensitive: bool = False) -> InsertOneResult:
         post = data
         post['last-update'] = datetime.datetime.now(tz = datetime.UTC)
-        post_id = collection.insert_one(post).insert_id
+        post_json = json.dumps(post)
+        post_id = collection.insert_one(post_json).insert_id
         return post_id
 
 # similarly convert fetched json and use json.loads to convert into python object.
     @staticmethod
-    def fetch_one():
-        pass
+    def fetch_one(collection: Collection, query: Dict[str, Any]) -> Dict[str, Any]:
+        data_json = collection.find_one(query)
+        data = json.loads(data_json)
+        return data
 
 # Implementation needed. Use JWT library to encrypt? Do not send sensitive details. Save in cookie httponly.
 class JWTHandler:
@@ -184,7 +189,6 @@ class RedisHandler:
 
     def set(self, key: str, data: Union[str, Dict]) -> bool:
         data = json.dumps(data)
-
         return self.redis_client.set(key, data)
     
     def get(self, key: Union[str, Dict]) -> Union[str, Dict[str, str]]:
@@ -221,26 +225,29 @@ class GcpService:
         return email
 
 # AWS KMS
+# To do, load from environment variables instead
+# push environment variables into docker compose
 class KMSHandler:
     def __init__(self) -> None:
         self.access_key = Reader.from_json("../secrets/key_manager.json", 'AccessKey')
         self.secret_key = Reader.from_json("../secrets/key_manager.json", 'Secret')
         self.region = Reader.from_json("../secrets/key_manager.json", 'Region')
         self.client = boto3.client('kms', region_name = self.region, aws_access_key_id = self.access_key, aws_secret_access_key = self.secret_key)
-
+        self.keyID = Reader.from_json("../secrets/key_manager.json", 'AppCredentialsKeyID')
     def encrypt(self, data: bytes) -> bytes:
-        resp = self.client.encrypt(KeyId = '290f9ecc-878a-4a18-be3b-6b1039a8ea6d', Plaintext = data, EncryptionContext = {'context': 'auth_cred'})
+        resp = self.client.encrypt(KeyId = self.keyID, Plaintext = data, EncryptionContext = {'context': 'auth_cred'})
         if 'CiphertextBlob' in resp:
             return resp['CiphertextBlob']
         return None
 
     def decrypt(self, data: bytes) -> bytes:
-        resp = self.client.decrypt(CiphertextBlob = data, KeyId = '290f9ecc-878a-4a18-be3b-6b1039a8ea6d', EncryptionContext = {'context': 'auth_cred'})
+        resp = self.client.decrypt(CiphertextBlob = data, KeyId = self.keyID, EncryptionContext = {'context': 'auth_cred'})
         if 'Plaintext' in resp:
             return resp['Plaintext']
         return None
 
 # Must implement AWS KMS for CLIENT secrets file before creating docker image.
+# Use AWS KMS to encrypt the client secrets file, store in s3.
 class CredsGenerator:
     CLIENT_SECRETS_FILE = '../secrets/credentials.json'
     def __init__(self, scopes: List) -> None:
@@ -287,6 +294,8 @@ CLIENT_SECRETS_FILE = "../credentials.json"
 
 # flask
 app = Flask(__name__)
+# change secret key to session secret
+# app.secret_key = os.environ.get('SESSION_SECRET')
 app.secret_key = Reader.from_json("../secrets/secrets.json", 'session_secret')
 
 # change unique_id to session_id
