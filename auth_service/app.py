@@ -88,15 +88,15 @@ To Do:
 
 # we will continue to use crypto service since encrypting and decrypting data with AWS KMS alone can be very costly and time consuming
 # due to the number of requests and network latency.
-
+import base64
 from enum import Enum
 from flask import Flask, redirect, request, Response, url_for, session, make_response
 import requests
 import os
+# pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
-from pickle import loads
 from google.oauth2.credentials import Credentials
 import requests
 import json
@@ -107,9 +107,10 @@ from pymongo.database import Database
 from pymongo.collection import Collection
 from pymongo.results import InsertOneResult
 import datetime
-import urllib
 import boto3
 import uuid
+
+print("Loaded .env file:", os.getenv('ENCRYPTED_GOOGLE_APP_CRED'))
 
 class Scopes(Enum): 
     READ_PROFILE = "https://www.googleapis.com/auth/userinfo.profile"
@@ -134,8 +135,8 @@ class Reader:
 
 # read port from environment variable. set env variable in docker compose.
 class MongoDBHandler:
-    address = 'mongodb://127.0.0.1'
-    port = '27017'
+    address = os.getenv('MONGO_ADDRESS')
+    port = os.getenv('MONGO_PORT')
 
     @staticmethod
     def get_client(db: str) -> Database:
@@ -179,8 +180,8 @@ class JWTHandler:
 # what else do we need it for except login? maybe some active session details?
 class RedisHandler:
     def __init__(self) -> None:
-        self.host = 'localhost'
-        self.port = 6379
+        self.host = os.getenv('REDIS_HOST', 'redis')
+        self.port = os.getenv('REDIS_PORT')
         self.decode_responses = True
         self.redis_client = Redis(host = self.host, port = self.port, decode_responses= self.decode_responses)
 
@@ -189,11 +190,14 @@ class RedisHandler:
 
     def set(self, key: str, data: Union[str, Dict]) -> bool:
         data = json.dumps(data)
+        print("Redis set Data:", data)
         return self.redis_client.set(key, data)
     
     def get(self, key: Union[str, Dict]) -> Union[str, Dict[str, str]]:
+        print("Redis get key:", key)
         data = self.redis_client.get(key)
         data = json.loads(data)
+        print("Redis Data received:", data)
         return data
     
     def delete(self, key) -> None:
@@ -229,19 +233,20 @@ class GcpService:
 # push environment variables into docker compose
 class KMSHandler:
     def __init__(self) -> None:
-        self.access_key = Reader.from_json("../secrets/key_manager.json", 'AccessKey')
-        self.secret_key = Reader.from_json("../secrets/key_manager.json", 'Secret')
-        self.region = Reader.from_json("../secrets/key_manager.json", 'Region')
+        self.access_key = os.getenv('AUTH_KMS_ACCESS_KEY')
+        self.secret_key = os.getenv('AUTH_KMS_SECRET_KEY')
+        self.region = os.getenv('AUTH_KMS_REGION')
+        self.keyID = os.getenv('AUTH_APP_CREDENTIALS_KEYID')
         self.client = boto3.client('kms', region_name = self.region, aws_access_key_id = self.access_key, aws_secret_access_key = self.secret_key)
-        self.keyID = Reader.from_json("../secrets/key_manager.json", 'AppCredentialsKeyID')
+    
     def encrypt(self, data: bytes) -> bytes:
-        resp = self.client.encrypt(KeyId = self.keyID, Plaintext = data, EncryptionContext = {'context': 'auth_cred'})
+        resp = self.client.encrypt(KeyId = self.keyID, Plaintext = data, EncryptionContext = {'context': 'google_app_cred'})
         if 'CiphertextBlob' in resp:
             return resp['CiphertextBlob']
         return None
 
     def decrypt(self, data: bytes) -> bytes:
-        resp = self.client.decrypt(CiphertextBlob = data, KeyId = self.keyID, EncryptionContext = {'context': 'auth_cred'})
+        resp = self.client.decrypt(CiphertextBlob = data, KeyId = self.keyID, EncryptionContext = {'context': 'google_app_cred'})
         if 'Plaintext' in resp:
             return resp['Plaintext']
         return None
@@ -249,15 +254,20 @@ class KMSHandler:
 # Must implement AWS KMS for CLIENT secrets file before creating docker image.
 # Use AWS KMS to encrypt the client secrets file, store in s3.
 class CredsGenerator:
-    CLIENT_SECRETS_FILE = '../secrets/credentials.json'
+    # urgent
     def __init__(self, scopes: List) -> None:
         self.scope = ['openid']
         self.scope += scopes
-    
+        encrypted_app_cred = os.getenv("ENCRYPTED_GOOGLE_APP_CRED")
+        encrypted_app_cred_bytes = base64.b64decode(encrypted_app_cred)
+        kms = KMSHandler()
+        self.CLIENT_SECRETS: str = kms.decrypt(encrypted_app_cred_bytes).decode('utf-8')
+        self.CLIENT_SECRETS: Dict[str: str] = json.loads(self.CLIENT_SECRETS)
+
     def authorize(self, unique_id) -> None: 
         # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps.
-        flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE, scopes=self.scope)
+        flow = google_auth_oauthlib.flow.Flow.from_client_config(
+        self.CLIENT_SECRETS, scopes=self.scope)
 
         # The URI created here must exactly match one of the authorized redirect URIs
         # for the OAuth 2.0 client, which you configured in the API Console. If this
@@ -276,8 +286,8 @@ class CredsGenerator:
         return redirect(self.authorization_url)
     
     def callback(self, state, unique_id) -> Credentials:
-        flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-            CLIENT_SECRETS_FILE, self.scope, state = state 
+        flow = google_auth_oauthlib.flow.Flow.from_client_config(
+            self.CLIENT_SECRETS, self.scope, state = state 
         )
         flow.redirect_uri = url_for('callback',unique_id = unique_id, _external = True)
         authorization_response: str = request.url
@@ -287,16 +297,13 @@ class CredsGenerator:
         return self.credentials
 
 # ENVIRONMENT VARIABLES
-os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # used to ensure oauthlib can operate without https
-
-# change mechanism/file, use AWS KMS
-CLIENT_SECRETS_FILE = "../credentials.json"
+# os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # used to ensure oauthlib can operate without https
 
 # flask
 app = Flask(__name__)
 # change secret key to session secret
 # app.secret_key = os.environ.get('SESSION_SECRET')
-app.secret_key = Reader.from_json("../secrets/secrets.json", 'session_secret')
+app.secret_key = os.getenv('SESSION_SECRET')
 
 # change unique_id to session_id
 @app.route('/')
@@ -355,4 +362,4 @@ def callback(unique_id):
     return response
 
 if __name__ == '__main__':
-    app.run(host="127.0.0.1", port = 5000)
+    app.run(host="0.0.0.0", port = os.getenv('AUTH_PORT'))
