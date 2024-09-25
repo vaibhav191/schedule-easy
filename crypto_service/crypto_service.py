@@ -18,7 +18,13 @@ pem_pub = public_key.public_bytes(encoding = Encoding.PEM, format=PublicFormat.S
 encoded = jwt.encode({"Some":"data"}, serialization.load_pem_private_key(pem,password=passphrase,backend=default_backend()), algorithm="ES256K")
 jwt.decode(encoded,pem_pub, "ES256K", options={"verify_signature":True})
 '''
+'''
+To Do:
+- Before responding encode with base64
+- Decode using base64
+'''
 
+import base64
 from enum import Enum
 from flask import Flask, jsonify, request, Response
 from typing import Optional, Dict, List, Union
@@ -64,6 +70,20 @@ Keys = Enum('Keys', ['OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN', 'REDIS_E
 
 KeyTypes = Enum('KeyTypes', ['ASYMMETRIC', 'SYMMETRIC'])
 
+class Passwords:
+    def __init__(self) -> None:
+        self.passwords = {
+            Keys.OAUTH_CREDENTIALS: None,
+            Keys.JWT_TOKEN: None,
+            Keys.REFRESH_TOKEN: None
+        }
+    def get_password(self, key: Keys) -> str:
+        if self.passwords[key] is None:
+            self.passwords[key] = FileHandler.read_from_json(os.path.join(CryptoUtils.secrets_folder, CryptoUtils.secrets_file), key.name)
+        return self.passwords[key]
+
+password_obj = Passwords()
+
 class CryptoUtils:
     secrets_folder = 'secrets/'
     secrets_file = 'secrets.json'
@@ -99,6 +119,8 @@ class CryptoUtils:
             if not os.path.exists(os.path.join(CryptoUtils.secrets_folder, key_name.name + extension)):
                 CryptoUtils.keygen(key_name=key_name, key_type=CryptoUtils.key_map[key_name.name])
             key = FileHandler.read_from_file(os.path.join(CryptoUtils.secrets_folder, key_name.name + extension))
+            if type(key) is str:
+                key = key.encode('utf-8')
             return key
         # else its a symmetric key used for redis
         key = CryptoUtils.keygen(key_name=key_name, key_type=CryptoUtils.key_map[key_name.name])        
@@ -162,12 +184,19 @@ class CryptoUtils:
             - key_name: OAUTH_CREDENTIALS, JWT_TOKEN, REFRESH_TOKEN
             - To Do: private key should be fetched using key_name
         '''
-        if type(pvt_key) is str:
-            pvt_key = pvt_key.encode('utf-8')
+        pvt_key = CryptoUtils.get_key(key_name=Keys[key_name], pvt=True)
         
-        password = FileHandler.read_from_json(os.path.join(CryptoUtils.secrets_folder, CryptoUtils.secrets_file),key_name)
+        ciphertext = base64.b64decode(ciphertext)
+
+        password = password_obj.get_password(Keys[key_name])
         if type(password) is str:
             password = password.encode('utf-8')
+        print(password)
+        print(type(password))
+        print(pvt_key)
+        print(type(pvt_key))
+        print(ciphertext)
+        print(type(ciphertext))
         pvt_key = serialization.load_pem_private_key(pvt_key, password= password)
         
         plaintext = pvt_key.decrypt(
@@ -180,37 +209,41 @@ class CryptoUtils:
                     )
         return plaintext
 
-@app.route("/get-key", methods = ['GET'])
+@app.route("/get-key", methods = ['POST'])
 def get_key():
     '''
-    Requires 1 argument 'key_details' containing json object with the following:
-    key_name: example - 'OAUTH_CREDENTIALS'
-            OAUTH_CREDENTIALS 
-            JWT_TOKEN 
-            REFRESH_TOKEN 
-            REDIS_ENCRYPTION 
-    pub: bool
-    pvt: bool
-    params = {'key_details': json.dumps({'key_name': 'OAUTH_CREDENTIALS', 'pvt':True})}
-    requests.get('http://127.0.0.1:7070/get-key', params=params)
-    To Do: Change to POST request for security
+    - Requires 1 argument 'key_details' containing json object with the following:
+        - key_name: 
+            - OAUTH_CREDENTIALS 
+            - JWT_TOKEN 
+            - REFRESH_TOKEN 
+            - REDIS_ENCRYPTION 
+    - params = {'key_details': {'key_name': 'OAUTH_CREDENTIALS'}}
+    - Sample request: requests.post('http://127.0.0.1:7070/get-key', json=params)
     '''
-    if 'key_details' not in request.args:
-        return "Bad Request: Require key details", 400
+    if not request.is_json:
+        return "Bad Request: Require JSON format", 400
+    if 'key_details' not in request.get_json():
+        return "Bad Request: key_details", 400
+    if 'key_name' not in request.get_json()['key_details']:
+        return "Bad Request: key_name required in key_details", 400
+    if request.get_json()['key_details']['key_name'] not in Keys.__members__:
+        return "Bad Request: Invalid key_name", 400
     try:
-        key_details = json.loads(request.args['key_details'])
-    except json.JSONDecodeError:
+        key_details = request.get_json()['key_details']
+    except (KeyError, TypeError):
         return jsonify({"error": "Bad Request: Invalid JSON format"}), 400
     key_name = key_details.get('key_name')
-    pub = key_details.get('pub', False)
-    pvt = key_details.get('pvt', False)
 
     if not key_name:
         return "key_name required in key_details", 400
 
-    key = CryptoUtils.get_key(key_name=Keys[key_name], pub=pub, pvt=pvt)
-
-    return key, 200
+    key = CryptoUtils.get_key(key_name=Keys[key_name], pub=True)
+    if type(key) is bytes:
+        key_string = key.decode('utf-8')
+    else:
+        key_string = key
+    return jsonify({f"{key_name}_pub": key_string}), 200
 
 @app.route("/decrypt", methods = ['POST'])
 def decrypt():
@@ -219,7 +252,34 @@ def decrypt():
             - Implement decryption
             - Fetch private key from key_name
     '''
-    pass
+    if not request.is_json:
+        return "Bad Request: Require JSON format", 400
+    if 'key_details' not in request.get_json():
+        return "Bad Request: key_details", 400
+    if 'key_name' not in request.get_json()['key_details']:
+        return "Bad Request: key_name required in key_details", 400
+    if request.get_json()['key_details']['key_name'] not in {'OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN'}:
+        return "Bad Request: Invalid key_name", 400
+    if 'ciphertext' not in request.get_json()['key_details']:
+        return "Bad Request: ciphertext required", 400
+    try:
+        key_details = request.get_json()['key_details']
+    except (KeyError, TypeError):
+        return jsonify({"error": "Bad Request: Invalid JSON format"}), 400
+    
+    key_name = key_details.get('key_name')
+    ciphertext = key_details['ciphertext']
+    if ciphertext is None:
+        return "ciphertext required", 400
+    if type(ciphertext) is str:
+        ciphertext = ciphertext.encode('utf-8')
+     
+    plaintext = CryptoUtils.decrypt(ciphertext, key_name)
+    if type(plaintext) is bytes:
+        plaintext = plaintext.decode('utf-8')
+    print(plaintext)
+    print(type(plaintext))
+    return jsonify({"plaintext": plaintext}), 200
 
 if __name__ == '__main__':
     CryptoUtils()
