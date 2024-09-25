@@ -21,7 +21,9 @@ jwt.decode(encoded,pem_pub, "ES256K", options={"verify_signature":True})
 '''
 To Do:
 - Before responding encode with base64
-- Decode using base64
+- Decode using base64 (only accepts bytes)
+    - whenever sending data to the service, encode with base64 to get bytes
+    - whenever receiving data from the service, decode with base64 to get  
 '''
 
 import base64
@@ -64,6 +66,8 @@ class FileHandler:
         elif type(data) is str:
             with open(path, "w") as f:
                 f.write(data)
+        else:
+            raise ValueError("Data type not supported")
         
         
 Keys = Enum('Keys', ['OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN', 'REDIS_ENCRYPTION'])
@@ -73,14 +77,18 @@ KeyTypes = Enum('KeyTypes', ['ASYMMETRIC', 'SYMMETRIC'])
 class Passwords:
     def __init__(self) -> None:
         self.passwords = {
-            Keys.OAUTH_CREDENTIALS: None,
-            Keys.JWT_TOKEN: None,
-            Keys.REFRESH_TOKEN: None
+            Keys.OAUTH_CREDENTIALS.name: None,
+            Keys.JWT_TOKEN.name: None,
+            Keys.REFRESH_TOKEN.name: None
         }
     def get_password(self, key: Keys) -> str:
-        if self.passwords[key] is None:
-            self.passwords[key] = FileHandler.read_from_json(os.path.join(CryptoUtils.secrets_folder, CryptoUtils.secrets_file), key.name)
-        return self.passwords[key]
+        print("password obj: ",self.passwords)
+        if self.passwords[key.name] is None:
+            self.passwords[key.name] = FileHandler.read_from_json(os.path.join(CryptoUtils.secrets_folder, CryptoUtils.secrets_file), key.name)
+            print("password obj: ",self.passwords)
+            self.passwords[key.name] = self.passwords[key.name].encode('utf-8')
+        
+        return self.passwords[key.name]
 
 password_obj = Passwords()
 
@@ -126,7 +134,6 @@ class CryptoUtils:
         key = CryptoUtils.keygen(key_name=key_name, key_type=CryptoUtils.key_map[key_name.name])        
         return key
     
-    #To Do: leverage https://safecurves.cr.yp.to/ to write a safe EC private key generator
     @staticmethod
     def keygen(key_name:Keys, key_type: KeyTypes) -> Union[None, bytes]:
         if not os.path.exists(CryptoUtils.secrets_folder):
@@ -158,8 +165,8 @@ class CryptoUtils:
         elif key_type == KeyTypes.SYMMETRIC:
             key = Fernet.generate_key()
             return key
-            # FileHandler.write(key_name.value, key)
 
+    # fix required: it should only accept bytes
     @staticmethod
     def encrypt(pub_key, message) -> bytes:
         if type(pub_key) is str:
@@ -185,8 +192,8 @@ class CryptoUtils:
             - To Do: private key should be fetched using key_name
         '''
         pvt_key = CryptoUtils.get_key(key_name=Keys[key_name], pvt=True)
-        
-        ciphertext = base64.b64decode(ciphertext)
+        if type(ciphertext) is str:
+            return TypeError("Ciphertext should be bytes") 
 
         password = password_obj.get_password(Keys[key_name])
         if type(password) is str:
@@ -239,47 +246,43 @@ def get_key():
         return "key_name required in key_details", 400
 
     key = CryptoUtils.get_key(key_name=Keys[key_name], pub=True)
-    if type(key) is bytes:
-        key_string = key.decode('utf-8')
-    else:
-        key_string = key
-    return jsonify({f"{key_name}_pub": key_string}), 200
+    key_base64 = base64.b64encode(key).decode('utf-8')
+    return jsonify({f"{key_name}": key_base64}), 200
 
 @app.route("/decrypt", methods = ['POST'])
 def decrypt():
     '''
-        - To Do:
-            - Implement decryption
-            - Fetch private key from key_name
+        - key_name: str
+            - OAUTH_CREDENTIALS 
+            - JWT_TOKEN 
+            - REFRESH_TOKEN 
+        - ciphertext: base64 encoded str of a bytes object
     '''
     if not request.is_json:
         return "Bad Request: Require JSON format", 400
-    if 'key_details' not in request.get_json():
-        return "Bad Request: key_details", 400
-    if 'key_name' not in request.get_json()['key_details']:
+    data = request.get_json()
+    if 'key_name' not in data:
         return "Bad Request: key_name required in key_details", 400
-    if request.get_json()['key_details']['key_name'] not in {'OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN'}:
-        return "Bad Request: Invalid key_name", 400
-    if 'ciphertext' not in request.get_json()['key_details']:
-        return "Bad Request: ciphertext required", 400
-    try:
-        key_details = request.get_json()['key_details']
-    except (KeyError, TypeError):
-        return jsonify({"error": "Bad Request: Invalid JSON format"}), 400
     
-    key_name = key_details.get('key_name')
-    ciphertext = key_details['ciphertext']
-    if ciphertext is None:
-        return "ciphertext required", 400
-    if type(ciphertext) is str:
-        ciphertext = ciphertext.encode('utf-8')
-     
-    plaintext = CryptoUtils.decrypt(ciphertext, key_name)
-    if type(plaintext) is bytes:
-        plaintext = plaintext.decode('utf-8')
+    key_name: str = data.get('key_name')
+
+    if key_name not in {'OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN'}:
+        return "Bad Request: Invalid key_name", 400
+    
+    if 'ciphertext' not in data:
+        return "Bad Request: ciphertext required", 400
+    
+    ciphertext_base64_encoded = data['ciphertext']
+    if ciphertext_base64_encoded is None:
+        return "Bad Request: ciphertext required", 400
+
+    ciphertext: bytes = base64.b64decode(ciphertext_base64_encoded)
+    print(ciphertext)
+    plaintext: bytes = CryptoUtils.decrypt(ciphertext, key_name)
     print(plaintext)
     print(type(plaintext))
-    return jsonify({"plaintext": plaintext}), 200
+    plaintext_base64 = base64.b64encode(plaintext).decode('utf-8')
+    return jsonify({"plaintext": plaintext_base64}), 200
 
 if __name__ == '__main__':
     CryptoUtils()
