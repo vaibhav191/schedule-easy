@@ -109,6 +109,11 @@ from pymongo.results import InsertOneResult
 import datetime
 import boto3
 import uuid
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.fernet import Fernet
 
 print("Loaded .env file:", os.getenv('ENCRYPTED_GOOGLE_APP_CRED'))
 
@@ -133,7 +138,6 @@ class Reader:
             data = f.reads()
         return data
 
-# read port from environment variable. set env variable in docker compose.
 class MongoDBHandler:
     address = os.getenv('MONGO_ADDRESS')
     port = os.getenv('MONGO_PORT')
@@ -148,7 +152,6 @@ class MongoDBHandler:
         collection: Collection = db[collection_name]
         return collection
 
-# need to convert data into json so we can insert all kinds of data without having to check for types or use different insert functions.
     @staticmethod
     def insert_one(collection: Collection, data: Dict[str, Any], sensitive: bool = False) -> InsertOneResult:
         post = data
@@ -157,7 +160,6 @@ class MongoDBHandler:
         post_id = collection.insert_one(post_json).insert_id
         return post_id
 
-# similarly convert fetched json and use json.loads to convert into python object.
     @staticmethod
     def fetch_one(collection: Collection, query: Dict[str, Any]) -> Dict[str, Any]:
         data_json = collection.find_one(query)
@@ -229,8 +231,6 @@ class GcpService:
         return email
 
 # AWS KMS
-# To do, load from environment variables instead
-# push environment variables into docker compose
 class KMSHandler:
     def __init__(self) -> None:
         self.access_key = os.getenv('AUTH_KMS_ACCESS_KEY')
@@ -251,13 +251,13 @@ class KMSHandler:
             return resp['Plaintext']
         return None
 
-# Must implement AWS KMS for CLIENT secrets file before creating docker image.
-# Use AWS KMS to encrypt the client secrets file, store in s3.
 class CredsGenerator:
     # urgent
     def __init__(self, scopes: List) -> None:
         self.scope = ['openid']
         self.scope += scopes
+        
+        # decrypt the encrypted app credentials using AWS KMS
         encrypted_app_cred = os.getenv("ENCRYPTED_GOOGLE_APP_CRED")
         encrypted_app_cred_bytes = base64.b64decode(encrypted_app_cred)
         kms = KMSHandler()
@@ -297,12 +297,9 @@ class CredsGenerator:
         return self.credentials
 
 # ENVIRONMENT VARIABLES
-# os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1' # used to ensure oauthlib can operate without https
 
 # flask
 app = Flask(__name__)
-# change secret key to session secret
-# app.secret_key = os.environ.get('SESSION_SECRET')
 app.secret_key = os.getenv('SESSION_SECRET')
 
 # change unique_id to session_id
@@ -344,6 +341,7 @@ def callback(unique_id):
     request_url = data.get('request_url') 
 
     credgen = CredsGenerator(scope)
+    
     # To Do: implement encryption if data is sensitive. Use Asymm encryption. Request the Key from CryptoUtils.
     #       Then store in mongodb the necessary user details
     credentials = credgen.callback(state= state, unique_id= unique_id)
@@ -360,6 +358,156 @@ def callback(unique_id):
     response.set_cookie('unique_id',unique_id, httponly=True)
 
     return response
+
+class Keys(Enum):
+    OAUTH_CREDENTIALS, JWT_TOKEN, REFRESH_TOKEN, REDIS_ENCRYPTION = range(4)
+
+class KeyTypes(Enum):
+    pub, pvt, symmetric = range(3)
+
+class CryptoCommunicator:
+    '''
+    Functions for communicating with the crypto service
+
+    Used for encrypting:
+        1. Google App Credentials
+        2. JWT Token
+        3. JWT Refresh Token
+        4. Redis Cache Data
+
+    Keys & Key Types:
+        1. OAUTH_CREDENTIALS: Asymmetric encryption
+         -Used for Google App Credentials
+        2. JWT_TOKEN: Asymmetric encryption
+        3. REFRESH_TOKEN: Asymmetric encryption
+        4. REDIS_ENCRYPTION: Symmetric encryption
+    '''
+
+    key_types = {
+        Keys.OAUTH_CREDENTIALS: {KeyTypes.pub, KeyTypes.pvt},
+        Keys.JWT_TOKEN: {KeyTypes.pub, KeyTypes.pvt},
+        Keys.REFRESH_TOKEN: {KeyTypes.pub, KeyTypes.pvt},
+        Keys.REDIS_ENCRYPTION: {KeyTypes.symmetric},
+    }
+
+    Crypto_host = os.getenv('CRYPTO_HOST')
+    Crypto_port = os.getenv('CRYPTO_PORT')
+
+    @staticmethod
+    def get_public_key(key_name: Keys) -> bytes:
+        '''
+            - Valid for key_name: OAUTH_CREDENTIALS, JWT_TOKEN, REFRESH_TOKEN
+            - Returns public key for the given key_name, type: bytes
+            - Example request:
+                1. Get Key OAuth Credentials Public Key
+                 -http://127.0.0.1:7070/get-key?key_details={%22key_name%22:+%22OAUTH_CREDENTIALS%22,%22pub%22:+true}
+        '''
+        if key_name not in CryptoCommunicator.key_types:
+            raise Exception("Invalid key_name")
+        if KeyTypes.pub not in CryptoCommunicator.key_types[key_name]:
+            raise Exception("Public key not available for the given key_name")
+        
+        url = f"http://{CryptoCommunicator.Crypto_host}:{CryptoCommunicator.Crypto_port}/get-key"
+        key_details = {'key_name': key_name.name, 
+                       'pub': True 
+                    }
+        key_details_json = json.dumps(key_details)
+        response = requests.get(url, params = {'key_details': key_details_json})
+        if response.status_code == 200:
+            print(f"Key received from crypto service, response: {response.content}")
+            return response.content
+        else:
+            print(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")  
+            raise Exception("Failed to get key from crypto service")
+
+    @staticmethod
+    def get_symmetric_key(key_name: Keys, key_type: KeyTypes) -> bytes:
+        '''
+            - Valid for key_name: REDIS_ENCRYPTION
+            - Returns symmetric key, type: bytes
+        '''
+        if key_name not in CryptoCommunicator.key_types:
+            raise Exception("Invalid key_name")
+        if KeyTypes.symmetric not in CryptoCommunicator.key_types[key_name]:
+            raise Exception("Symmetric Key not available for the given key_name")
+        
+        url = f"http://{CryptoCommunicator.Crypto_host}:{CryptoCommunicator.Crypto_port}/get-key"
+        key_details = {'key_name': key_name.name}
+        key_details_json = json.dumps(key_details)
+        response = requests.get(url, params = {'key_details': key_details_json})
+        if response.status_code == 200:
+            print(f"Key received from crypto service, response: {response.content}")
+            return response.content
+        else:
+            print(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")  
+            raise Exception("Failed to get key from crypto service")
+
+    @staticmethod
+    def asymm_encrypt(data: bytes, key: bytes, key_name: Keys, key_type: KeyTypes) -> bytes:
+        '''
+            - Encrypts the data using the key provided locally
+            - Calls RSA for asymmetric encryption: OAUTH_CREDENTIALS, JWT_TOKEN, REFRESH_TOKEN
+            - key_types = {
+                Keys.OAUTH_CREDENTIALS: {KeyTypes.pub, KeyTypes.pvt},
+                Keys.JWT_TOKEN: {KeyTypes.pub, KeyTypes.pvt},
+                Keys.REFRESH_TOKEN: {KeyTypes.pub, KeyTypes.pvt},
+            }
+        '''
+        if not key_name or type(key_name) is not Keys or key_name not in {Keys.OAUTH_CREDENTIALS, Keys.JWT_TOKEN, Keys.REFRESH_TOKEN}:
+            raise Exception("Invalid key_name")
+        if not key or type(key) is not bytes:
+            raise Exception("Key must be of type bytes")
+        if type(data) is not bytes:
+            raise Exception("Data must be of type bytes")
+        if key_type != KeyTypes.pub:
+            raise Exception("Invalid key_type")
+        public_key = serialization.load_pem_public_key(key)
+        ciphertext = public_key.encrypt(
+            data,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        return ciphertext
+
+    @staticmethod
+    def asymm_decrypt(ciphertext: bytes, key_name: Keys) -> bytes:
+        '''
+            - Calls the crypto service to decrypt the data since the private keys are stored there and key password is required for decryption using private key
+        '''
+        if not key_name or type(key_name) is not Keys or key_name not in {Keys.OAUTH_CREDENTIALS, Keys.JWT_TOKEN, Keys.REFRESH_TOKEN}:
+            raise Exception("Invalid key_name")
+        if type(ciphertext) is not bytes:
+            raise Exception("Data must be of type bytes")
+        if KeyTypes.pvt not in CryptoCommunicator.key_types[key_name]:
+            raise Exception("Private key not available for the given key_name")
+        
+        url = f"http://{CryptoCommunicator.Crypto_host}:{CryptoCommunicator.Crypto_port}/decrypt"
+
+    
+    def symm_encrypt(data: bytes, key: bytes) -> bytes:
+        '''
+            - Currently only used for Redis Cache Encryption
+        '''
+        f = Fernet(key)
+        return f.encrypt(data)
+
+    def symm_decrypt(data: bytes, key: bytes) -> bytes:
+        '''
+            - Currently only used for Redis Cache Encryption
+        '''
+        f = Fernet(key)
+        return f.decrypt(data)
+
+    @staticmethod
+    def sign(data: bytes) -> bytes:
+        pass
+
+    @staticmethod
+    def verify(data: bytes) -> bytes:
+        pass
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port = os.getenv('AUTH_PORT'))
