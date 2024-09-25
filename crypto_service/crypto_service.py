@@ -267,14 +267,24 @@ def get_key():
 @app.route("/decrypt", methods = ['POST'])
 def decrypt():
     '''
-        - Requires 2 arguments 'key_details' and 'ciphertext' containing json object with the following:
-            - 'key_name': str
-                - 'OAUTH_CREDENTIALS' 
-                - 'JWT_TOKEN' 
-                - 'REFRESH_TOKEN' 
-            - 'ciphertext': base64 encoded str of a bytes object
-
-        - Returns 'plaintext': base64 encoded str of a bytes object
+    Decrypts a given ciphertext using a specified key.
+    Args:
+        key_name: str
+            The name of the key to use for decryption. Must be one of {'OAUTH_CREDENTIALS', '
+        ciphertext: str
+            The ciphertext to decrypt, encoded in base64.
+    Returns:
+        A JSON response containing the decrypted plaintext in base64 encoding, 
+        or an error message with an appropriate HTTP status code.
+    Error Responses:
+        400 Bad Request:
+            - If the request is not in JSON format.
+            - If 'key_name' is not provided in the request data.
+            - If 'key_name' is not one of {'OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN'}.
+            - If 'ciphertext' is not provided in the request data or is None.
+    Success Response:
+        200 OK:
+            - A JSON object with the decrypted plaintext in base64 encoding.
     '''
     if not request.is_json:
         return "Bad Request: Require JSON format", 400
