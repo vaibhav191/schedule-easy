@@ -7,7 +7,6 @@
 # 3. Asymm encryption for jwt refresh token
 # 4. Symm encryption with real time key generation for redis cache data (stores keys themselves 
 # so many fetches arent required)
-# Let's use ES256 - ECDSA signature algorithm using SHA-256 hash algorithm
 # https://pyjwt.readthedocs.io/en/stable/algorithms.html#asymmetric-public-key-algorithms
 
 '''
@@ -158,9 +157,10 @@ class CryptoUtils:
             label=None))
         return ciphertext
     @staticmethod
-    def decrypt(pvt_key, ciphertext: bytes, key_name: str) -> bytes:
+    def decrypt(ciphertext: bytes, key_name: str) -> bytes:
         '''
-        key_name: OAUTH_CREDENTIALS, JWT_TOKEN, REFRESH_TOKEN
+            - key_name: OAUTH_CREDENTIALS, JWT_TOKEN, REFRESH_TOKEN
+            - To Do: private key should be fetched using key_name
         '''
         if type(pvt_key) is str:
             pvt_key = pvt_key.encode('utf-8')
@@ -193,6 +193,7 @@ def get_key():
     pvt: bool
     params = {'key_details': json.dumps({'key_name': 'OAUTH_CREDENTIALS', 'pvt':True})}
     requests.get('http://127.0.0.1:7070/get-key', params=params)
+    To Do: Change to POST request for security
     '''
     if 'key_details' not in request.args:
         return "Bad Request: Require key details", 400
@@ -210,6 +211,15 @@ def get_key():
     key = CryptoUtils.get_key(key_name=Keys[key_name], pub=pub, pvt=pvt)
 
     return key, 200
+
+@app.route("/decrypt", methods = ['POST'])
+def decrypt():
+    '''
+        - To Do:
+            - Implement decryption
+            - Fetch private key from key_name
+    '''
+    pass
 
 if __name__ == '__main__':
     CryptoUtils()
