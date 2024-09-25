@@ -220,13 +220,14 @@ class CryptoUtils:
 def get_key():
     '''
     - Requires 1 argument 'key_details' containing json object with the following:
-        - key_name: 
-            - OAUTH_CREDENTIALS 
-            - JWT_TOKEN 
-            - REFRESH_TOKEN 
-            - REDIS_ENCRYPTION 
+        - key_name: str 
+            - 'OAUTH_CREDENTIALS' 
+            - 'JWT_TOKEN'
+            - 'REFRESH_TOKEN' 
+            - 'REDIS_ENCRYPTION' 
     - params = {'key_details': {'key_name': 'OAUTH_CREDENTIALS'}}
     - Sample request: requests.post('http://127.0.0.1:7070/get-key', json=params)
+    - Returns key in base64 encoded format
     '''
     if not request.is_json:
         return "Bad Request: Require JSON format", 400
@@ -252,11 +253,14 @@ def get_key():
 @app.route("/decrypt", methods = ['POST'])
 def decrypt():
     '''
-        - key_name: str
-            - OAUTH_CREDENTIALS 
-            - JWT_TOKEN 
-            - REFRESH_TOKEN 
-        - ciphertext: base64 encoded str of a bytes object
+        - Requires 2 arguments 'key_details' and 'ciphertext' containing json object with the following:
+            - 'key_name': str
+                - 'OAUTH_CREDENTIALS' 
+                - 'JWT_TOKEN' 
+                - 'REFRESH_TOKEN' 
+            - 'ciphertext': base64 encoded str of a bytes object
+
+        - Returns 'plaintext': base64 encoded str of a bytes object
     '''
     if not request.is_json:
         return "Bad Request: Require JSON format", 400
