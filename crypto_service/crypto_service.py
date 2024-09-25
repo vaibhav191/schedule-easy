@@ -121,24 +121,34 @@ class CryptoUtils:
     @staticmethod
     def get_key(key_name: Keys, pub: bool = False, pvt:bool = False) -> bytes:
         if not os.path.exists(CryptoUtils.secrets_folder):
+            print("Creating secrets folder")
             CryptoUtils.create_secret_dir()
         if CryptoUtils.key_map[key_name.name] == KeyTypes.ASYMMETRIC:
             extension = '.pub' if pub else '.pem' if pvt else ''
             if not os.path.exists(os.path.join(CryptoUtils.secrets_folder, key_name.name + extension)):
+                print("Generating key:", key_name.name)
                 CryptoUtils.keygen(key_name=key_name, key_type=CryptoUtils.key_map[key_name.name])
+            print("Reading key:", key_name.name)
             key = FileHandler.read_from_file(os.path.join(CryptoUtils.secrets_folder, key_name.name + extension))
+            print("key from path: ", os.path.join(CryptoUtils.secrets_folder, key_name.name + extension))
             if type(key) is str:
                 key = key.encode('utf-8')
+            print("returning asymmetric key: ", key_name.name)
             return key
         # else its a symmetric key used for redis
+        print("Generating symmetric key:", key_name.name)
         key = CryptoUtils.keygen(key_name=key_name, key_type=CryptoUtils.key_map[key_name.name])        
+        print("returning symmetric key: ", key_name.name)
         return key
     
     @staticmethod
     def keygen(key_name:Keys, key_type: KeyTypes) -> Union[None, bytes]:
         if not os.path.exists(CryptoUtils.secrets_folder):
+            print("Creating secrets folder")
             CryptoUtils.create_secret_dir()
         if key_type == KeyTypes.ASYMMETRIC:
+            print("Generating Asymmetric key")
+            print("key_name: ", key_name)
             key_password = FileHandler.read_from_json(os.path.join(CryptoUtils.secrets_folder, CryptoUtils.secrets_file), key_name.name)
             key_password = key_password.encode('utf-8')
             # generating private key
@@ -146,24 +156,28 @@ class CryptoUtils:
                 public_exponent=65537,
                 key_size=2048,
                 )
+            print("key_password: ", key_password)
             pem = private_key.private_bytes(
                 encoding = Encoding.PEM,
                 format=PrivateFormat.PKCS8,
                 encryption_algorithm=BestAvailableEncryption(key_password)
                 )
+            print("writing private key: ", key_name.name)
             FileHandler.write(path = os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pem'), data=pem)
-
+            print("key written to file:", os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pem'))
             # generating public key
             public_key = private_key.public_key()
             pub = public_key.public_bytes(
                 encoding = Encoding.PEM,
                 format=PublicFormat.SubjectPublicKeyInfo
                 )
+            print("writing public key: ", key_name.name)
             FileHandler.write(path = os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pub'), data=pub)
-
+            print("key written to file:", os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pub'))
         # we do not save symmetric keys, since its only used for redis cache encryption
         elif key_type == KeyTypes.SYMMETRIC:
             key = Fernet.generate_key()
+            print("returning symmetric key: ", key_name.name)
             return key
 
     # fix required: it should only accept bytes
