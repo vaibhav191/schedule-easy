@@ -287,21 +287,26 @@ def decrypt():
             - A JSON object with the decrypted plaintext in base64 encoding.
     '''
     if not request.is_json:
+        print("Bad Request: Require JSON format", request.get_json())
         return "Bad Request: Require JSON format", 400
     data = request.get_json()
     if 'key_name' not in data:
+        print("Bad Request: key_name required in key_details", request.get_json())
         return "Bad Request: key_name required in key_details", 400
     
     key_name: str = data.get('key_name')
 
     if key_name not in {'OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN'}:
+        print("Bad Request: Invalid key_name", request.get_json())
         return "Bad Request: Invalid key_name", 400
     
     if 'ciphertext' not in data:
+        print("Bad Request: ciphertext required", request.get_json())
         return "Bad Request: ciphertext required", 400
     
     ciphertext_base64_encoded = data['ciphertext']
     if ciphertext_base64_encoded is None:
+        print("Bad Request: ciphertext required", request.get_json())
         return "Bad Request: ciphertext required", 400
 
     ciphertext: bytes = base64.b64decode(ciphertext_base64_encoded)
