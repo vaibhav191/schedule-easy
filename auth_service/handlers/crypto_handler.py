@@ -5,8 +5,11 @@ import cryptography.hazmat.primitives.hashes as hashes
 import cryptography.hazmat.primitives.asymmetric.padding as padding
 import cryptography.hazmat.primitives.asymmetric.rsa as rsa
 from cryptography.fernet import Fernet
-from ..models import Keys, KeyTypes
+from ..models.keys import Keys
+from ..models.key_types import KeyTypes
 import os
+from typing import Tuple
+
 class CryptoHandler:
     """
     CryptoHandler class provides methods to handle cryptographic operations such as key retrieval, encryption, and decryption.
@@ -118,7 +121,7 @@ class CryptoHandler:
             raise Exception("Failed to get key from crypto service")
     
     @staticmethod
-    def get_private_key(key_name: Keys) -> bytes:
+    def get_private_key(key_name: Keys) -> Tuple[bytes, bytes]:
         """
         Retrieves the private key for the specified key name from the crypto service.
         Args:
@@ -152,7 +155,12 @@ class CryptoHandler:
             print(f"Key received from crypto service, response: {response.content}")
             if key_name.name in response.json():
                 key_b64 = response.json()[key_name.name]
-                return base64.b64decode(key_b64)
+                key = base64.b64decode(key_b64)
+                password = None
+                if 'password' in response.json():
+                    password_b64 = response.json()['password']
+                    password = base64.b64decode(password_b64) 
+                return key, password
         else:
             print(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")  
             raise Exception("Failed to get key from crypto service")
