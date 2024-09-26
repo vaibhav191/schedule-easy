@@ -232,6 +232,7 @@ class CryptoUtils:
 
 # To Do: Add a handshake between auth service and crypto service to ensure that the keys are being fetched by the right service
     # or use a shared secret between the two services
+    # check if we can store the pvt key passwords in possibly a vault
 @app.route("/get-jwt-pvt-key", methods = ['POST'])
 def get_jwt_pvt_key():
     """
@@ -243,7 +244,9 @@ def get_jwt_pvt_key():
 
     key = CryptoUtils.get_key(key_name=Keys.JWT_TOKEN, pvt=True)
     key_base64 = base64.b64encode(key).decode('utf-8')
-    return jsonify({"JWT_TOKEN": key_base64}), 200
+    password = password_obj.get_password(Keys.JWT_TOKEN)
+    password_base64 = base64.b64encode(password).decode('utf-8')
+    return jsonify({"JWT_TOKEN": key_base64, "password": password_base64}), 200
 
 # To Do: Add a handshake between auth service and crypto service to ensure that the keys are being fetched by the right service
     # or use a shared secret between the two services
@@ -258,7 +261,9 @@ def get_refresh_pvt_key():
 
     key = CryptoUtils.get_key(key_name=Keys.REFRESH_TOKEN, pvt=True)
     key_base64 = base64.b64encode(key).decode('utf-8')
-    return jsonify({"REFRESH_TOKEN": key_base64}), 200
+    password = password_obj.get_password(Keys.REFRESH_TOKEN)
+    password_base64 = base64.b64encode(password).decode('utf-8')
+    return jsonify({"REFRESH_TOKEN": key_base64, "password": password_base64}), 200
 
 @app.route("/get-key", methods = ['POST'])
 def get_key():
