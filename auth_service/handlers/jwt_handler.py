@@ -38,9 +38,9 @@ class JWTHandler:
             "iss": "schedule-easy/auth-service",
             "sub": user,
             "aud": "schedule-easy/*",
-            "exp": str(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15)),
-            "nbf": str(datetime.datetime.now(datetime.timezone.utc)),
-            "iat": str(datetime.datetime.now(datetime.timezone.utc)),
+            "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15),
+            "nbf": datetime.datetime.now(datetime.timezone.utc),
+            "iat": datetime.datetime.now(datetime.timezone.utc),
             "jti": jwt_id,
             "tkn": "auth token"
         }
@@ -49,9 +49,9 @@ class JWTHandler:
             "iss": "schedule-easy/auth-service",
             "sub": user,
             "aud": "schedule-easy/*",
-            "exp": str(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)),
-            "nbf": str(datetime.datetime.now(datetime.timezone.utc)),
-            "iat": str(datetime.datetime.now(datetime.timezone.utc)),
+            "exp": datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30),
+            "nbf": datetime.datetime.now(datetime.timezone.utc),
+            "iat": datetime.datetime.now(datetime.timezone.utc),
             "jti": refresh_id,
             "tkn": "refresh token"
         }
