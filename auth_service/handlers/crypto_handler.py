@@ -87,11 +87,11 @@ class CryptoHandler:
         Keys.REDIS_ENCRYPTION: {KeyTypes.symmetric},
     }
 
-    Crypto_host = os.getenv('CRYPTO_HOST')
-    Crypto_port = os.getenv('CRYPTO_PORT')
+    def __init__(self):
+        self.Crypto_host = os.getenv('CRYPTO_HOST')
+        self.Crypto_port = os.getenv('CRYPTO_PORT')
 
-    @staticmethod
-    def get_public_key(key_name: Keys) -> bytes:
+    def get_public_key(self, key_name: Keys) -> bytes:
         """
         Retrieves the public key for the given key name from the crypto service.
         Args:
@@ -107,7 +107,7 @@ class CryptoHandler:
         if KeyTypes.pub not in CryptoHandler.key_types[key_name]:
             raise Exception("Public key not available for the given key_name")
         
-        url = f"http://{CryptoHandler.Crypto_host}:{CryptoHandler.Crypto_port}/get-key"
+        url = f"http://{self.Crypto_host}:{self.Crypto_port}/get-key"
         key_details = {'key_name': key_name.name, 
                     }
         response = requests.post(url, json = {'key_details': key_details})
@@ -120,8 +120,7 @@ class CryptoHandler:
             print(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")  
             raise Exception("Failed to get key from crypto service")
     
-    @staticmethod
-    def get_private_key(key_name: Keys) -> Tuple[bytes, bytes]:
+    def get_private_key(self,key_name: Keys) -> Tuple[bytes, bytes]:
         """
         Retrieves the private key for the specified key name from the crypto service.
         Args:
@@ -149,7 +148,7 @@ class CryptoHandler:
         else:
             print("Invalid key_name:", key_name)
             raise Exception("Invalid key_name")    
-        url = f"http://{CryptoHandler.Crypto_host}:{CryptoHandler.Crypto_port}" + endpoint
+        url = f"http://{self.Crypto_host}:{self.Crypto_port}" + endpoint
         response = requests.post(url)
         if response.status_code == 200:
             print(f"Key received from crypto service, response: {response.content}")
@@ -165,8 +164,7 @@ class CryptoHandler:
             print(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")  
             raise Exception("Failed to get key from crypto service")
 
-    @staticmethod
-    def get_symmetric_key(key_name: Keys) -> bytes:
+    def get_symmetric_key(self, key_name: Keys) -> bytes:
         """
         Retrieves a symmetric key from the crypto service.
         Args:
@@ -187,7 +185,7 @@ class CryptoHandler:
         if KeyTypes.symmetric not in CryptoHandler.key_types[key_name]:
             raise Exception("Symmetric Key not available for the given key_name")
         
-        url = f"http://{CryptoHandler.Crypto_host}:{CryptoHandler.Crypto_port}/get-key"
+        url = f"http://{self.Crypto_host}:{self.Crypto_port}/get-key"
         key_details = {'key_name': key_name.name}
         response = requests.post(url, params = {'key_details': key_details})
         if response.status_code == 200:
@@ -222,8 +220,11 @@ class CryptoHandler:
         try:
             public_key = serialization.load_pem_public_key(key)
         except Exception as e:
+            print(e)
             raise Exception("Public key serialization failed, check key")
         try:
+            print("Data:", data)
+            print("Key:", key)
             ciphertext = public_key.encrypt(
                 data,
                 padding.OAEP(
@@ -233,11 +234,12 @@ class CryptoHandler:
                 )
             )
         except Exception as e:
+            print(e)
             raise Exception("Failed to encrypt data. Check data.")
+
         return ciphertext
 
-    @staticmethod
-    def asymm_decrypt(ciphertext: bytes, key_name: Keys) -> bytes:
+    def asymm_decrypt(self, ciphertext: bytes, key_name: Keys) -> bytes:
         """
         Decrypts the given ciphertext using an asymmetric decryption method.
         Args:
@@ -261,7 +263,7 @@ class CryptoHandler:
 
         ciphertext_b64 = base64.b64encode(ciphertext).decode('utf-8')
 
-        url = f"http://{CryptoHandler.Crypto_host}:{CryptoHandler.Crypto_port}/decrypt"
+        url = f"http://{self.Crypto_host}:{self.Crypto_port}/decrypt"
         key_details = {'key_name': key_name.name, 'ciphertext': ciphertext_b64}
         print("Key Details:", key_details)
         response = requests.post(url, json = key_details)
@@ -275,6 +277,7 @@ class CryptoHandler:
             print(f"Failed to get data from crypto service, response: {response.content}, status code: {response.status_code}")  
             raise Exception("Failed to get data from crypto service")
     
+    @staticmethod
     def symm_encrypt(data: bytes, key: bytes) -> bytes:
         """
         Encrypts the given data using symmetric encryption with the provided key.
@@ -293,6 +296,7 @@ class CryptoHandler:
         f = Fernet(key)
         return f.encrypt(data)
 
+    @staticmethod
     def symm_decrypt(data: bytes, key: bytes) -> bytes:
         """
         Decrypts the given data using the provided symmetric key.

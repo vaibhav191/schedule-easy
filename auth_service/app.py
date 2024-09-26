@@ -33,6 +33,7 @@ app = Flask(__name__)
 app.secret_key = os.getenv('SESSION_SECRET')
 
 key_wallet = KeyHandler()
+crypto_handler = CryptoHandler()
 
 # change unique_id to session_id
 @app.route('/')
@@ -99,8 +100,11 @@ def callback(unique_id):
     jwt_token, refresh_token = JWTHandler.create_tokens(user, jwt_id, jwt_pvt_key, jwt_key_password, refresh_id, refresh_pvt_key, refresh_key_password)
 
     # encrypt credentials
-    oauth_pub_key = key_wallet.get_pub_key(Keys.OAUTH_TOKEN)
-    credentials_encrypted = CryptoHandler.asymm_encrypt(credentials, oauth_pub_key)
+    credentials_json = credentials.to_json()
+    credentials_bytes = credentials_json.encode('utf-8')
+    print("Credentials bytes:", credentials_bytes)
+    oauth_pub_key = key_wallet.get_pub_key(Keys.OAUTH_CREDENTIALS)
+    credentials_encrypted = crypto_handler.asymm_encrypt(credentials_bytes, oauth_pub_key)
 
     # initialize mongo
     db = MongoDBHandler.get_client('auth')
