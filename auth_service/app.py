@@ -58,12 +58,15 @@ def home():
         return Response("Invalid JWT Token", 401)
 
     # check if unique_id is present in redis
-    rc = RedisHandler()
     try:
         data = rc.get(unique_id)
     except Exception as e:
         print("Error fetching data from redis:", e)
-        return Response("Error fetching data from redis", 500)
+        return Response("Error fetching data from redis, try again later.", 500)
+    # check if email is present in data
+    email = data.get('email')
+    if not email:
+        return Response("Invalid email", 401)
 
     return Response(f"OK {email}", 200)
 
@@ -180,7 +183,7 @@ def refresh():
     data = rc.get(unique_id)
 
     if not refresh_token or not jwt_token or not unique_id or not data:
-        return redirect(url_for('login', next = request.url))
+        return Response("Invalid request", 401)
     email = data.get('email')
 
     jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
@@ -198,8 +201,8 @@ def refresh():
         # invalid jwt and refresh token combination
         # or not matching emails
         # can possibly log this refresh token and username in security logs for further investigation
-        # for now have them login again
-        return redirect(url_for('login', next = request.url))
+        # throw error
+        return Response("Invalid JWT and Refresh Token combination", 401)
 
     # create new jwt token and refresh token
     jwt_id = str(uuid.uuid4())
@@ -215,7 +218,8 @@ def refresh():
     post_id = mongo_handler.update_one(collection, query, user_record)
     if not post_id:
         print("Error updating user record in mongo")
-        return Response("Error updating user record in mongo", 500)
+        return Response("Error updating user record in mongo, try again later", 500)
+
     print("User record updated in mongo")
     # update jwt_token and refresh_token in cookies
     response = make_response(redirect(request.url))
