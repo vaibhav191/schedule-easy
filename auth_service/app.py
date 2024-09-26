@@ -44,11 +44,9 @@ def home():
     unique_id = request.cookies.get('unique_id')
     refresh_token = request.cookies.get('refresh_token')
     jwt_token = request.cookies.get('jwt_token')
-    # check if email is present in data
-    email = data.get('email')
     
     # check if unique_id, refresh_token and jwt_token are present in cookies else redirect to login
-    if not unique_id or not refresh_token or not jwt_token or not data.get('email'):
+    if not unique_id or not refresh_token or not jwt_token:
         return redirect(url_for('login', next = request.url))
     
     # validate jwt token
@@ -62,6 +60,7 @@ def home():
         data = rc.get(unique_id)
     except Exception as e:
         print("Error fetching data from redis:", e)
+        print("removing cookies")
         return Response("Error fetching data from redis, try again later.", 500)
     # check if email is present in data
     email = data.get('email')
@@ -188,8 +187,8 @@ def refresh():
 
     jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
     refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
-    jwt_id = jwt.decode(jwt_token, jwt_key, verify=False).get('jti')
-    refresh_id = jwt.decode(refresh_token, refresh_key, verify=False).get('jti')
+    jwt_id = jwt.decode(jwt_token, jwt_key, algorithms=['RS256'], verify=False).get('jti')
+    refresh_id = jwt.decode(refresh_token, refresh_key,algorithms=['RS256'], verify=False).get('jti')
 
     # check if jwt_id and refresh_id are present in mongo
     db = mongo_handler.get_client('auth') 
@@ -248,8 +247,8 @@ def logout():
     # get jwt_id and refresh_id from jwt_token and refresh_token
     jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
     refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
-    jwt_id = jwt.decode(jwt_token, jwt_key, verify=False).get('jti')
-    refresh_id = jwt.decode(refresh_token, refresh_key, verify=False).get('jti')
+    jwt_id = jwt.decode(jwt_token, jwt_key, algorithms=['RS256'], verify=False).get('jti')
+    refresh_id = jwt.decode(refresh_token, refresh_key,algorithms=['RS256'], verify=False).get('jti')
 
     # Remove jwt_id and refresh_id from MongoDB
     db = mongo_handler.get_client('auth')
