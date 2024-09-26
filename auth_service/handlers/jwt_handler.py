@@ -15,6 +15,12 @@
 '''
 
 # Implementation needed. Use JWT library to encrypt? Do not send sensitive details. Save in cookie httponly.
+import datetime
+from typing import Tuple
+import uuid
+import jwt
+from cryptography.hazmat.primitives import serialization
+
 class JWTHandler:
     # authorization server ,ust verify that the user who is requesting for
     # refresh token is the same user who was issued the JWT token.
@@ -27,12 +33,53 @@ class JWTHandler:
     # access token should be short lived, refresh token should be long lived.
     # access token should only be requested with the minimum scope required.
     @staticmethod
-    def create_jwt_token():
-        pass
-    @staticmethod
-    def create_refresh_token():
-        pass
-    def validate_jwt_token():
-        pass
-    def validate_refresh_token():
-        pass
+    def create_tokens(user: str, jwt_id: str, jwt_pvt_key: bytes, jwt_key_password: bytes, refresh_id: str, refresh_key: bytes, refresh_key_password: bytes)-> Tuple[str, str]:
+        jwt_payload = {
+            "iss": "schedule-easy/auth-service",
+            "sub": user,
+            "aud": "schedule-easy/*",
+            "exp": str(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15)),
+            "nbf": str(datetime.datetime.now(datetime.timezone.utc)),
+            "iat": str(datetime.datetime.now(datetime.timezone.utc)),
+            "jti": jwt_id,
+            "tkn": "auth token"
+        }
+
+        refresh_payload = {
+            "iss": "schedule-easy/auth-service",
+            "sub": user,
+            "aud": "schedule-easy/*",
+            "exp": str(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)),
+            "nbf": str(datetime.datetime.now(datetime.timezone.utc)),
+            "iat": str(datetime.datetime.now(datetime.timezone.utc)),
+            "jti": refresh_id,
+            "tkn": "refresh token"
+        }
+        
+        jwt_pvt_key_serialized = serialization.load_pem_private_key(jwt_pvt_key, password=jwt_key_password)
+        jwt_token = jwt.encode(jwt_payload, jwt_pvt_key_serialized, algorithm='RS256')
+        
+        refresh_pvt_key_serialized = serialization.load_pem_private_key(refresh_key, password=refresh_key_password)
+        refresh_token = jwt.encode(refresh_payload, refresh_pvt_key_serialized, algorithm='RS256')
+
+        return jwt_token, refresh_token 
+
+    def validate_jwt_token(jwt_token: str, jwt_pub_key: bytes):
+        try:
+            data = jwt.decode(jwt_token, jwt_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
+            if data['tkn'] != "auth token":
+                print("Invalid token")
+                return False
+        except jwt.ExpiredSignatureError or jwt.InvalidAudienceError or jwt.InvalidIssuerError or jwt.InvalidIssuedAtError:
+            print("Error with JWT token")
+            return False
+        return True
+    def validate_refresh_token(refresh_token: str, refresh_pub_key: bytes):
+        try:
+            data = jwt.decode(refresh_token, refresh_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
+            if data['tkn'] != "refresh token":
+                print("Invalid token")
+                return False
+        except jwt.ExpiredSignatureError or jwt.InvalidAudienceError or jwt.InvalidIssuerError or jwt.InvalidIssuedAtError:
+            print("Error with Refresh token")
+            return False
