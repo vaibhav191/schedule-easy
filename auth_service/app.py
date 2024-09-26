@@ -241,6 +241,31 @@ class CryptoHandler:
         else:
             print(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")  
             raise Exception("Failed to get key from crypto service")
+    
+    @staticmethod
+    def get_private_key(key_name: Keys) -> bytes:
+        if key_name not in CryptoHandler.key_types:
+            raise Exception("Invalid key_name")
+        if KeyTypes.pvt not in CryptoHandler.key_types[key_name]:
+            raise Exception("Private key not available for the given key_name")
+        
+        if key_name == Keys.REFRESH_TOKEN:
+            endpoint = '/get-refresh-pvt-key'
+        elif key_name == Keys.JWT_TOKEN:
+            endpoint = '/get-jwt-pvt-key'
+        else:
+            print("Invalid key_name:", key_name)
+            raise Exception("Invalid key_name")    
+        url = f"http://{CryptoHandler.Crypto_host}:{CryptoHandler.Crypto_port}" + endpoint
+        response = requests.post(url)
+        if response.status_code == 200:
+            print(f"Key received from crypto service, response: {response.content}")
+            if key_name.name in response.json():
+                key_b64 = response.json()[key_name.name]
+                return base64.b64decode(key_b64)
+        else:
+            print(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")  
+            raise Exception("Failed to get key from crypto service")
 
     @staticmethod
     def get_symmetric_key(key_name: Keys) -> bytes:
@@ -423,6 +448,16 @@ class MongoDBHandler:
 
 # Implementation needed. Use JWT library to encrypt? Do not send sensitive details. Save in cookie httponly.
 class JWTHandler:
+    # authorization server ,ust verify that the user who is requesting for
+    # refresh token is the same user who was issued the JWT token.
+    # issue a new refresh token whenever refresh is called. (refresh token rotation)
+    # If a refresh token is
+    #    compromised and subsequently used by both the attacker and the
+    #    legitimate client, one of them will present an invalidated refresh
+    #    token, which will inform the authorization server of the breach.
+    #   The authorization server can then revoke the refresh token.
+    # access token should be short lived, refresh token should be long lived.
+    # access token should only be requested with the minimum scope required.
     @staticmethod
     def create_jwt_token():
         pass
