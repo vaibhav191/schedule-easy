@@ -228,5 +228,39 @@ def refresh():
     # return response
     return response
 
+@app.route('/logout', methods=['POST'])
+def logout():
+    unique_id = request.cookies.get('unique_id')
+    refresh_token = request.cookies.get('refresh_token')
+    jwt_token = request.cookies.get('jwt_token')
+
+    if not unique_id or not refresh_token or not jwt_token:
+        return Response("Invalid request", 401)
+    
+    # delete unique_id from redis
+    rc.delete(unique_id)
+    # delete jwt_token and refresh_token from cookies
+    response = make_response(redirect(url_for('login')))
+    response.set_cookie('unique_id', '', expires=0)
+    response.set_cookie('jwt_token', '', expires=0)
+    response.set_cookie('refresh_token', '', expires=0)
+
+    # get jwt_id and refresh_id from jwt_token and refresh_token
+    jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+    refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
+    jwt_id = jwt.decode(jwt_token, jwt_key, verify=False).get('jti')
+    refresh_id = jwt.decode(refresh_token, refresh_key, verify=False).get('jti')
+
+    # Remove jwt_id and refresh_id from MongoDB
+    db = mongo_handler.get_client('auth')
+    collection = mongo_handler.get_collection(db, 'user_data')
+    query = {'jwt-id': jwt_id, 'refresh-id': refresh_id}
+    update_query = {'$unset': {'jwt-id': '', 'refresh-id': ''}}
+    post_id = mongo_handler.update_one(collection, query, update_query)
+    if not post_id:
+        print("Error updating user record in mongo: ", post_id)
+
+    return Response("Logged out", 200)
+
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port = os.getenv('AUTH_PORT'))
