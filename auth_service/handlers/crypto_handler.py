@@ -201,6 +201,7 @@ class CryptoHandler:
     def asymm_encrypt(data: bytes, key: bytes ) -> bytes:
         """
         Encrypts the given data using the provided public key with asymmetric encryption.
+        Max encryption size is 190 bytes, any data larger will be encrypted in chunks.
         Args:
             data (bytes): The data to be encrypted. Must be of type bytes.
             key (bytes): The public key used for encryption. Must be of type bytes.
@@ -222,26 +223,46 @@ class CryptoHandler:
         except Exception as e:
             print(e)
             raise Exception("Public key serialization failed, check key")
+        if len(data) <= 190:
+            try:
+                print("Data:", data)
+                print("Key:", key)
+                ciphertext = public_key.encrypt(
+                    data,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+            except Exception as e:
+                print(e)
+                raise Exception("Failed to encrypt data. Check data.")
+
+            return ciphertext
         try:
             print("Data:", data)
             print("Key:", key)
-            ciphertext = public_key.encrypt(
-                data,
-                padding.OAEP(
-                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
+            ciphertext = b''
+            for i in range(0, len(data), 190):
+                chunk = data[i:i+190]
+                ciphertext += public_key.encrypt(
+                    chunk,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
                 )
-            )
         except Exception as e:
             print(e)
             raise Exception("Failed to encrypt data. Check data.")
-
         return ciphertext
 
     def asymm_decrypt(self, ciphertext: bytes, key_name: Keys) -> bytes:
         """
         Decrypts the given ciphertext using an asymmetric decryption method.
+        Max decryption size is 256 bytes, any data larger will be decrypted in chunks.
         Args:
             ciphertext (bytes): The encrypted data to be decrypted.
             key_name (Keys): The name of the key to be used for decryption. Must be one of Keys.OAUTH_CREDENTIALS, Keys.JWT_TOKEN, or Keys.REFRESH_TOKEN.
@@ -268,15 +289,31 @@ class CryptoHandler:
         print("Key Details:", key_details)
         response = requests.post(url, json = key_details)
         print("Response:", response.content, response.status_code)
-        if response.status_code == 200:
-            print(f"Data received from crypto service, response: {response.content}")
-            if 'plaintext' in response.json():
-                plaintext_b64 = response.json()['plaintext']
-                return base64.b64decode(plaintext_b64)
-        else:
-            print(f"Failed to get data from crypto service, response: {response.content}, status code: {response.status_code}")  
-            raise Exception("Failed to get data from crypto service")
-    
+        if len(ciphertext) <= 256:
+            if response.status_code == 200:
+                print(f"Data received from crypto service, response: {response.content}")
+                if 'plaintext' in response.json():
+                    plaintext_b64 = response.json()['plaintext']
+                    return base64.b64decode(plaintext_b64)
+            else:
+                print(f"Failed to get data from crypto service, response: {response.content}, status code: {response.status_code}")  
+                raise Exception("Failed to get data from crypto service")
+        plaintext = b''
+        for i in range(0, len(ciphertext), 256):
+            chunk = ciphertext[i:i+256]
+            chunk_b64 = base64.b64encode(chunk).decode('utf-8')
+            key_details = {'key_name': key_name.name, 'ciphertext': chunk_b64}
+            response = requests.post(url, json = key_details)
+            if response.status_code == 200:
+                print(f"Data received from crypto service, response: {response.content}")
+                if 'plaintext' in response.json():
+                    plaintext_b64 = response.json()['plaintext']
+                    plaintext += base64.b64decode(plaintext_b64)
+            else:
+                print(f"Failed to get data from crypto service, response: {response.content}, status code: {response.status_code}")  
+                raise Exception("Failed to get data from crypto service")
+        return plaintext
+
     @staticmethod
     def symm_encrypt(data: bytes, key: bytes) -> bytes:
         """
