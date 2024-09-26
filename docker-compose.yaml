@@ -51,16 +51,18 @@ services:
       AUTH_APP_CREDENTIALS_KEYID: ${AUTH_APP_CREDENTIALS_KEYID}
       OAUTHLIB_INSECURE_TRANSPORT: ${OAUTHLIB_INSECURE_TRANSPORT}
       AUTH_PORT: ${AUTH_PORT}
-      MONGO_ADDRESS: ${MONGO_ADDRESS}
-      MONGO_PORT: ${MONGO_PORT}
+      MONGO_ADDRESS: mongo
+      MONGO_PORT: 27017
       SESSION_SECRET: ${SESSION_SECRET}
       REDIS_PORT: ${REDIS_PORT}
       REDIS_HOST: redis
-      CRYPTO_PORT: ${CRYPTO_PORT}
-      CRYPTO_HOST: ${CRYPTO_HOST}
+      CRYPTO_PORT: 7070
+      CRYPTO_HOST: crypto_service
       ENCRYPTED_GOOGLE_APP_CRED: ${ENCRYPTED_GOOGLE_APP_CRED}
     depends_on:
       - redis
+      - crypto_service
+      - mongo
 
 volumes:
   redis-data:

@@ -22,7 +22,7 @@ from pymongo.results import InsertOneResult
 from typing import Dict, Any
 class MongoDBHandler:
     def __init__(self):
-        self.address = os.getenv('MONGO_ADDRESS')
+        self.address = os.getenv('MONGO_ADDRESS', 'mongo')
         self.port = os.getenv('MONGO_PORT')
 
     

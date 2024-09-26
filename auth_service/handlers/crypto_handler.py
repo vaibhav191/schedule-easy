@@ -88,8 +88,8 @@ class CryptoHandler:
     }
 
     def __init__(self):
-        self.Crypto_host = os.getenv('CRYPTO_HOST')
-        self.Crypto_port = os.getenv('CRYPTO_PORT')
+        self.Crypto_host = os.getenv('CRYPTO_HOST', 'crypto_service')
+        self.Crypto_port = os.getenv('CRYPTO_PORT', '7070')
 
     def get_public_key(self, key_name: Keys) -> bytes:
         """

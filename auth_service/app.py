@@ -1,8 +1,7 @@
 '''
 To Do:
-1. Move get-email to auth_service # Login won't work if google fails to respond to
-    request for get-email
-2. Remove gcp_service
+1. Implement proper validation of JWT tokens and refresh tokens.
+2. Implement /refresh endpoint to refresh JWT tokens.
 '''
 
 # we will continue to use crypto service since encrypting and decrypting data with AWS KMS alone can be very costly and time consuming
