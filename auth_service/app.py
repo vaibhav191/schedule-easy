@@ -244,6 +244,21 @@ class CryptoHandler:
     
     @staticmethod
     def get_private_key(key_name: Keys) -> bytes:
+        """
+        Retrieves the private key for the specified key name from the crypto service.
+        Args:
+            key_name (Keys): The name of the key to retrieve. Must be a member of the Keys enum.
+        Returns:
+            bytes: The private key in bytes.
+        Raises:
+            Exception: If the key_name is invalid or if the private key is not available for the given key_name.
+            Exception: If the request to the crypto service fails.
+        Notes:
+            - The private key requested must either be of type REFRESH_TOKEN or JWT_TOKEN.
+            - The function constructs the endpoint URL based on the key_name and sends a POST request to the crypto service.
+            - If the response status code is 200, it decodes the base64-encoded key from the response and returns it.
+            - If the response status code is not 200, it raises an exception.
+        """
         if key_name not in CryptoHandler.key_types:
             raise Exception("Invalid key_name")
         if KeyTypes.pvt not in CryptoHandler.key_types[key_name]:
