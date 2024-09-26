@@ -134,6 +134,7 @@ def callback(unique_id):
     user_record = mongo_handler.fetch_one(collection, query)
     print("User record:", user_record)
     if not user_record:
+        # insert user record in mongo
         print("User record not found in mongo")
         user_record = {
             'email': email,
@@ -149,7 +150,7 @@ def callback(unique_id):
             return Response("Error inserting user record in mongo", 500)
         else:
             print("User record inserted in mongo")
-
+    # update user record in mongo
     else:
         print("User record found in mongo")
         user_record['jwt-id'] = jwt_id
