@@ -7,6 +7,7 @@ To Do:
 
 # we will continue to use crypto service since encrypting and decrypting data with AWS KMS alone can be very costly and time consuming
 # due to the number of requests and network latency.
+import base64
 import datetime
 import json
 import os
@@ -34,6 +35,7 @@ app.secret_key = os.getenv('SESSION_SECRET')
 
 key_wallet = KeyHandler()
 crypto_handler = CryptoHandler()
+mongo_handler = MongoDBHandler()
 
 # change unique_id to session_id
 @app.route('/')
@@ -105,37 +107,46 @@ def callback(unique_id):
     print("Credentials bytes:", credentials_bytes)
     oauth_pub_key = key_wallet.get_pub_key(Keys.OAUTH_CREDENTIALS)
     credentials_encrypted = crypto_handler.asymm_encrypt(credentials_bytes, oauth_pub_key)
-
+    credentials_encrypted_b64 = base64.b64encode(credentials_encrypted).decode('utf-8')
+    print("Credentials encrypted b64:", credentials_encrypted_b64)
     # initialize mongo
-    db = MongoDBHandler.get_client('auth')
-    collection = MongoDBHandler.get_collection(db, 'user_data')
+    print("Initializing mongo")
+    db = mongo_handler.get_client('auth')
+    collection = mongo_handler.get_collection(db, 'user_data')
     query = {'email': email}
-    user_record_json = MongoDBHandler.fetch_one(collection, query)
-    if not user_record_json:
+    user_record = mongo_handler.fetch_one(collection, query)
+    print("User record:", user_record)
+    if not user_record:
         print("User record not found in mongo")
         user_record = {
             'email': email,
             'jwt-id': jwt_id,
             'refresh-id': refresh_id,
-            'credentials_encrypted': credentials_encrypted,
+            'credentials_encrypted': credentials_encrypted_b64,
             'registered-date': str(datetime.datetime.now(datetime.timezone.utc)),
             'last-update': str(datetime.datetime.now(datetime.timezone.utc))
         }
+        post_id = mongo_handler.insert_one(collection, user_record)
+        if not post_id:
+            print("Error inserting user record in mongo")
+            return Response("Error inserting user record in mongo", 500)
+        else:
+            print("User record inserted in mongo")
+
     else:
         print("User record found in mongo")
-        user_record = json.loads(user_record_json)
         user_record['jwt-id'] = jwt_id
         user_record['refresh-id'] = refresh_id
-        user_record['credentials_encrypted'] = credentials_encrypted
+        user_record['credentials_encrypted'] = credentials_encrypted_b64
         user_record['last-update'] = str(datetime.datetime.now(datetime.timezone.utc))
 
-    user_record_json = json.dumps(user_record)
-    post_id = MongoDBHandler.insert_one(collection, user_record)
+        post_id = mongo_handler.update_one(collection, query, user_record)
+        print("User record updated in mongo")
 
-    if not post_id:
-        print("Error inserting user record in mongo")
-        return Response("Error inserting user record in mongo", 500)
 
+    print("User record:", user_record)
+    print("Post ID:", post_id)
+    print("Unique ID:", unique_id)
     response = make_response(redirect(request_url))
     response.set_cookie('unique_id',unique_id, httponly=True)
     response.set_cookie('jwt_token', jwt_token, httponly=True)

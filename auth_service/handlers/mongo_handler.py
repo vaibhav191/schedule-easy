@@ -21,12 +21,13 @@ from pymongo.collection import Collection
 from pymongo.results import InsertOneResult
 from typing import Dict, Any
 class MongoDBHandler:
-    address = os.getenv('MONGO_ADDRESS')
-    port = os.getenv('MONGO_PORT')
+    def __init__(self):
+        self.address = os.getenv('MONGO_ADDRESS')
+        self.port = os.getenv('MONGO_PORT')
 
-    @staticmethod
-    def get_client(db: str) -> Database:
-        client: MongoClient = MongoClient(MongoDBHandler.address + ':' + MongoDBHandler.port)
+    
+    def get_client(self, db: str) -> Database:
+        client: MongoClient = MongoClient(self.address + ':' + self.port)
         return client[db]
     
     @staticmethod
@@ -35,15 +36,22 @@ class MongoDBHandler:
         return collection
 
     @staticmethod
-    def insert_one(collection: Collection, data: Dict[str, Any]) -> InsertOneResult:
-        post = data
-        post['last-update'] = datetime.datetime.now(tz = datetime.UTC)
-        post_json = json.dumps(post)
-        post_id = collection.insert_one(post_json).insert_id
+    def insert_one(collection: Collection, data: Dict[str, str]) -> InsertOneResult:
+        # post_json = json.dumps(data)
+        # print(type(post_json))
+        # print(post_json)
+        post_id = collection.insert_one(data).inserted_id
         return post_id
+    
+    @staticmethod
+    def update_one(collection: Collection, query: Dict[str, Any], data: Dict[str, Any]) -> None:
+        post_id = collection.update_one(query, {'$set': data})
+        return post_id
+
 
     @staticmethod
     def fetch_one(collection: Collection, query: Dict[str, Any]) -> Dict[str, Any]:
-        data_json = collection.find_one(query)
-        data = json.loads(data_json)
+        data = collection.find_one(query)
+        if not data:
+            return None
         return data
