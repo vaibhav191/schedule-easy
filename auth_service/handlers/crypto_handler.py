@@ -5,8 +5,8 @@ import cryptography.hazmat.primitives.hashes as hashes
 import cryptography.hazmat.primitives.asymmetric.padding as padding
 import cryptography.hazmat.primitives.asymmetric.rsa as rsa
 from cryptography.fernet import Fernet
-from ..models.keys import Keys
-from ..models.key_types import KeyTypes
+from models.keys import Keys
+from models.key_types import KeyTypes
 import os
 from typing import Tuple
 

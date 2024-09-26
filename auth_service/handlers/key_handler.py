@@ -1,7 +1,6 @@
 from typing import Tuple
-from ..models.keys import Keys
-from .crypto_handler import CryptoHandler
-
+from models.keys import Keys
+from handlers.crypto_handler import CryptoHandler
 
 class KeyHandler:
     def __init__(self):
