@@ -17,7 +17,6 @@
 # Implementation needed. Use JWT library to encrypt? Do not send sensitive details. Save in cookie httponly.
 import datetime
 from typing import Tuple
-import uuid
 import jwt
 from cryptography.hazmat.primitives import serialization
 
@@ -64,6 +63,7 @@ class JWTHandler:
 
         return jwt_token, refresh_token 
 
+    @staticmethod
     def validate_jwt_token(jwt_token: str, jwt_pub_key: bytes):
         try:
             data = jwt.decode(jwt_token, jwt_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
@@ -83,6 +83,8 @@ class JWTHandler:
             print("Invalid Issued At")
             return False
         return True
+
+    @staticmethod
     def validate_refresh_token(refresh_token: str, refresh_pub_key: bytes):
         try:
             data = jwt.decode(refresh_token, refresh_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
