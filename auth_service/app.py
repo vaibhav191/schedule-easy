@@ -408,7 +408,7 @@ class MongoDBHandler:
         return collection
 
     @staticmethod
-    def insert_one(collection: Collection, data: Dict[str, Any], sensitive: bool = False) -> InsertOneResult:
+    def insert_one(collection: Collection, data: Dict[str, Any]) -> InsertOneResult:
         post = data
         post['last-update'] = datetime.datetime.now(tz = datetime.UTC)
         post_json = json.dumps(post)
@@ -487,6 +487,9 @@ class GcpService:
 
 # AWS KMS
 class KMSHandler:
+    '''
+        Remember, KMSHandler does not need KMS Access and secret key when running on AWS through IAM roles.
+    '''
     def __init__(self) -> None:
         self.access_key = os.getenv('AUTH_KMS_ACCESS_KEY')
         self.secret_key = os.getenv('AUTH_KMS_SECRET_KEY')
@@ -550,8 +553,6 @@ class CredsGenerator:
         self.credentials = flow.credentials
         return self.credentials
 
-# ENVIRONMENT VARIABLES
-
 # flask
 app = Flask(__name__)
 app.secret_key = os.getenv('SESSION_SECRET')
@@ -583,7 +584,6 @@ def login():
     authorization_url = credgen.authorization_url
     return redirect(authorization_url)
 
-# once we have the credentials and email, store it in MongoDB after encryption of credentials using pub key
 @app.route('/oauth2callback/<unique_id>')
 def callback(unique_id):
     print("oauth2callback with unique id: ", str(unique_id))
@@ -595,23 +595,56 @@ def callback(unique_id):
     request_url = data.get('request_url') 
 
     credgen = CredsGenerator(scope)
-    
-    # To Do: implement encryption if data is sensitive. Use Asymm encryption. Request the Key from CryptoUtils.
-    #       Then store in mongodb the necessary user details
+    print("State:", state, "Unique ID:", unique_id) 
     credentials = credgen.callback(state= state, unique_id= unique_id)
-
+    print("Credentials generated:", credentials)
     if not credentials.valid:
+        print("Error with credentials")
         return Response("Error with credentials", 401)
 
-    # fetching email
+    print("Fetching email")
     email = GcpService.fetch_email_id( credentials = credentials)
+    print("Email fetched:", email)
     data['email'] = email
     rc.set(unique_id, data)
     
+    # store details in mongo
+        # check if email already exists in mongo
+        # if not, insert email, credentials, jwt, refresh token, last-update
+        # if yes, update jwt, refresh token, last-update
+        # encrypt credentials, jwt, refresh token
+    
+
     response = make_response(redirect(request_url))
     response.set_cookie('unique_id',unique_id, httponly=True)
 
     return response
+
+class KeyWallet:
+    """
+    A class to manage and retrieve cryptographic keys.
+
+    Attributes:
+    -----------
+    keys : dict
+        A dictionary that maps key names (from the Keys enum) to their corresponding cryptographic keys.
+
+    Methods:
+    --------
+    __init__():
+        Initializes the KeyWallet with a dictionary of keys set to None.
+    
+    get_key(key_name: Keys) -> bytes:
+        Retrieves the public key for the given key name. If the key is not already cached, it fetches the key using the CryptoHandler(which requests the same from crypto_service) and stores it in the keys dictionary.
+    """
+    def __init__(self):
+        self.keys = {x.name:None for x in Keys}
+    def get_key(self, key_name: Keys) -> bytes:
+        if not self.keys[key_name.name]:
+            self.keys[key_name.name] = CryptoHandler.get_public_key(key_name)
+        return self.keys[key_name.name]
+
+key_wallet = KeyWallet()
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port = os.getenv('AUTH_PORT'))

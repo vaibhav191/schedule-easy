@@ -230,6 +230,36 @@ class CryptoUtils:
                     )
         return plaintext
 
+# To Do: Add a handshake between auth service and crypto service to ensure that the keys are being fetched by the right service
+    # or use a shared secret between the two services
+@app.route("/get-jwt-pvt-key", methods = ['POST'])
+def get_jwt_pvt_key():
+    """
+    Retrieves the private JWT key, encodes it in base64, and returns it in a JSON response.
+
+    Returns:
+        tuple: A tuple containing a JSON response with the base64-encoded JWT private key and an HTTP status code 200.
+    """
+
+    key = CryptoUtils.get_key(key_name=Keys.JWT_TOKEN, pvt=True)
+    key_base64 = base64.b64encode(key).decode('utf-8')
+    return jsonify({"JWT_TOKEN": key_base64}), 200
+
+# To Do: Add a handshake between auth service and crypto service to ensure that the keys are being fetched by the right service
+    # or use a shared secret between the two services
+@app.route("/get-refresh-pvt-key", methods = ['POST'])
+def get_refresh_pvt_key():
+    """
+    Retrieves the private refresh key, encodes it in base64, and returns it in a JSON response.
+
+    Returns:
+        tuple: A tuple containing a JSON response with the base64-encoded refresh private key and an HTTP status code 200.
+    """
+
+    key = CryptoUtils.get_key(key_name=Keys.REFRESH_TOKEN, pvt=True)
+    key_base64 = base64.b64encode(key).decode('utf-8')
+    return jsonify({"REFRESH_TOKEN": key_base64}), 200
+
 @app.route("/get-key", methods = ['POST'])
 def get_key():
     '''
