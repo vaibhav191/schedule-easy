@@ -21,6 +21,7 @@ from handlers.jwt_handler import JWTHandler
 from handlers.crypto_handler import CryptoHandler
 from models.keys import Keys
 from handlers.mongo_handler import MongoDBHandler
+import jwt
 from dotenv import load_dotenv
 
 
@@ -35,18 +36,36 @@ app.secret_key = os.getenv('SESSION_SECRET')
 key_wallet = KeyHandler()
 crypto_handler = CryptoHandler()
 mongo_handler = MongoDBHandler()
+rc = RedisHandler()
 
 # change unique_id to session_id
 @app.route('/')
 def home():
     unique_id = request.cookies.get('unique_id')
-    if not unique_id:
+    refresh_token = request.cookies.get('refresh_token')
+    jwt_token = request.cookies.get('jwt_token')
+    # check if email is present in data
+    email = data.get('email')
+    
+    # check if unique_id, refresh_token and jwt_token are present in cookies else redirect to login
+    if not unique_id or not refresh_token or not jwt_token or not data.get('email'):
         return redirect(url_for('login', next = request.url))
     
+    # validate jwt token
+    jwt_pub_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+    jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_pub_key)
+    if not jwt_token_valid:
+        return Response("Invalid JWT Token", 401)
+
+    # check if unique_id is present in redis
     rc = RedisHandler()
-    data = rc.get(unique_id)
-    
-    return Response(f"OK {data.get('email')}", 200)
+    try:
+        data = rc.get(unique_id)
+    except Exception as e:
+        print("Error fetching data from redis:", e)
+        return Response("Error fetching data from redis", 500)
+
+    return Response(f"OK {email}", 200)
 
 @app.route('/login')
 def login():
@@ -69,7 +88,6 @@ def callback(unique_id):
     scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value]    
 
     # get state and request_url from redis 
-    rc = RedisHandler()
     data = rc.get(unique_id)
     state = data.get('state')
     request_url = data.get('request_url') 
@@ -122,8 +140,8 @@ def callback(unique_id):
             'jwt-id': jwt_id,
             'refresh-id': refresh_id,
             'credentials_encrypted': credentials_encrypted_b64,
-            'registered-date': str(datetime.datetime.now(datetime.timezone.utc)),
-            'last-update': str(datetime.datetime.now(datetime.timezone.utc))
+            'registered-date': datetime.datetime.now(datetime.timezone.utc),
+            'last-update': datetime.datetime.now(datetime.timezone.utc)
         }
         post_id = mongo_handler.insert_one(collection, user_record)
         if not post_id:
@@ -137,7 +155,7 @@ def callback(unique_id):
         user_record['jwt-id'] = jwt_id
         user_record['refresh-id'] = refresh_id
         user_record['credentials_encrypted'] = credentials_encrypted_b64
-        user_record['last-update'] = str(datetime.datetime.now(datetime.timezone.utc))
+        user_record['last-update'] = datetime.datetime.now(datetime.timezone.utc)
 
         post_id = mongo_handler.update_one(collection, query, user_record)
         print("User record updated in mongo")
@@ -153,7 +171,57 @@ def callback(unique_id):
 
     return response
 
+@app.route('/refresh-token', methods=['POST'])
+def refresh():
+    refresh_token = request.cookies.get('refresh_token')
+    jwt_token = request.cookies.get('jwt_token')
+    unique_id = request.cookies.get('unique_id')
+    data = rc.get(unique_id)
 
+    if not refresh_token or not jwt_token or not unique_id or not data:
+        return redirect(url_for('login', next = request.url))
+    email = data.get('email')
+
+    jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+    refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
+    jwt_id = jwt.decode(jwt_token, jwt_key, verify=False).get('jti')
+    refresh_id = jwt.decode(refresh_token, refresh_key, verify=False).get('jti')
+
+    # check if jwt_id and refresh_id are present in mongo
+    db = mongo_handler.get_client('auth') 
+    collection = mongo_handler.get_collection(db, 'user_data')
+    query = {'jwt-id': jwt_id, 'refresh-id': refresh_id}
+    user_record = mongo_handler.fetch_one(collection, query)
+    
+    if not user_record or not unique_id or not email or email != user_record.get('email'):
+        # invalid jwt and refresh token combination
+        # or not matching emails
+        # can possibly log this refresh token and username in security logs for further investigation
+        # for now have them login again
+        return redirect(url_for('login', next = request.url))
+
+    # create new jwt token and refresh token
+    jwt_id = str(uuid.uuid4())
+    refresh_id = str(uuid.uuid4())
+    jwt_pvt_key, jwt_key_password = key_wallet.get_pvt_key(Keys.JWT_TOKEN)
+    refresh_pvt_key, refresh_key_password = key_wallet.get_pvt_key(Keys.REFRESH_TOKEN)
+    jwt_token, refresh_token = JWTHandler.create_tokens(email, jwt_id, jwt_pvt_key, jwt_key_password, refresh_id, refresh_pvt_key, refresh_key_password)
+    # update jwt-id and refresh-id in mongo
+    user_record['jwt-id'] = jwt_id
+    user_record['refresh-id'] = refresh_id
+    user_record['last-update'] = datetime.datetime.now(datetime.timezone.utc)
+    # update last-update in mongo
+    post_id = mongo_handler.update_one(collection, query, user_record)
+    if not post_id:
+        print("Error updating user record in mongo")
+        return Response("Error updating user record in mongo", 500)
+    print("User record updated in mongo")
+    # update jwt_token and refresh_token in cookies
+    response = make_response(redirect(request.url))
+    response.set_cookie('jwt_token', jwt_token, httponly=True)
+    response.set_cookie('refresh_token', refresh_token, httponly=True)
+    # return response
+    return response
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port = os.getenv('AUTH_PORT'))
