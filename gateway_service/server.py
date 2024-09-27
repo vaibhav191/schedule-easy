@@ -6,6 +6,7 @@ from pymongo import MongoClient
 import os
 import gridfs
 import json
+from gateway_service.handlers.mongo_handler import MongoDBHandler
 from handlers.jwt_handler import JWTHandler
 from handlers.key_handler import KeyHandler
 from handlers.redis_handler import RedisHandler
@@ -20,20 +21,22 @@ from models.key_types import KeyTypes
 
 rc = RedisHandler()
 key_wallet = KeyHandler()
+mongo_handler = MongoDBHandler()
 
 server = Flask(__name__, template_folder='templates', static_folder='static')
 
 # we need redis,mongo, keywallet, jwt_handler, gridfs, requests
-auth_service_url = os.getenv('AUTH_SERVICE_URL', 'auth_service')
+auth_service_address = os.getenv('AUTH_SERVICE_ADDRESS', 'auth_service')
 auth_service_port = os.getenv('AUTH_SERVICE_PORT', '5000')
-auth_url = f"http://{auth_service_url}:{auth_service_port}"
+auth_service_url = f"http://{auth_service_address}:{auth_service_port}"
 login_endpoint = "/login"
 refresh_endpoint = "/refresh-token"
 logout_endpoint = "/logout"
 
-msg_service_url = os.getenv('MSG_SERVICE_URL', 'msg_service')
+msg_service_address = os.getenv('MSG_SERVICE_ADDRESS', 'msg_service')
 msg_service_port = os.getenv('MSG_SERVICE_PORT', '9989')
-
+msg_service_url = f"http://{msg_service_address}:{msg_service_port}"
+publish_event_endpoint = "/publish_event"
 
 def validate_tokens(f):
     def wrapper(*args, **kwargs):
@@ -66,14 +69,14 @@ def validate_tokens(f):
             refresh_token_valid = JWTHandler.validate_jwt_token(refresh_token, refresh_key)
             if not refresh_token_valid:
                 print("Refresh token not valid.")
-                return redirect(auth_url + login_endpoint)
+                return redirect(auth_service_url + login_endpoint)
             
             # if refresh token is valid, call refresh token endpoint
             print("Calling refresh token endpoint.")
-            response = requests.post(auth_url + refresh_endpoint)
+            response = requests.post(auth_service_url + refresh_endpoint)
             print("Refresh token response:", response)
             if response.status_code != 200:
-                return redirect(auth_url + login_endpoint)
+                return redirect(auth_service_url + login_endpoint)
 
             new_jwt_token = response.cookies.get('jwt_token')
             new_refresh_token = response.cookies.get('refresh_token')
@@ -122,16 +125,15 @@ def upload():
             # Check file size
             
             # init mongo client
-            client = MongoClient("mongodb://localhost:27017")
-            event_req_coll = client['event_automation']
-            if not client:
-                print("Mongo client not found")
-                return Response("Mongo client not found", 500)
-            fs = gridfs.GridFS(event_req_coll) 
+            db = mongo_handler.get_client('event_automation')
+            if not db:
+                print("Mongo client DB not found")
+                return Response("Mongo client DB not found", 500)
+            fs = gridfs.GridFS(db) 
             # call mongo service for upload
             fid = fs.put(uploaded_file)
             # send obj to msg_service publisher to eventQ
-            response = requests.post("http://127.0.0.1:9989/publish_event", json = {'fid': str(fid), 'jwt':session['Authorization'].split(' ')[1], 'email': session['email']})
+            response = requests.post(msg_service_url + publish_event_endpoint, json = {'fid': str(fid), 'jwt':session['Authorization'].split(' ')[1], 'email': session['email']})
             if response.status_code != 200:
                 print("Error posting to eventQ:",response)
                 return Response(f"Error posting to EventQ:{response}", status = 500)
@@ -147,7 +149,7 @@ def consume():
 
 @server.route("/login", methods = ["GET"])
 def login():
-    return redirect("http://127.0.0.1:5000/login")
+    return redirect(url_for('main'))
 
 if __name__ == "__main__":
     server.secret_key = "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"
