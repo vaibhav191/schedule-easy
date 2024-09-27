@@ -22,10 +22,10 @@ from handlers.crypto_handler import CryptoHandler
 from models.keys import Keys
 from handlers.mongo_handler import MongoDBHandler
 import jwt
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
 
-load_dotenv()
+# load_dotenv()
 print("ENVIRONMENT VARIABLES:", os.environ)
 
 
@@ -39,35 +39,35 @@ mongo_handler = MongoDBHandler()
 rc = RedisHandler()
 
 # change unique_id to session_id
-@app.route('/')
-def home():
-    unique_id = request.cookies.get('unique_id')
-    refresh_token = request.cookies.get('refresh_token')
-    jwt_token = request.cookies.get('jwt_token')
+# @app.route('/')
+# def home():
+#     unique_id = request.cookies.get('unique_id')
+#     refresh_token = request.cookies.get('refresh_token')
+#     jwt_token = request.cookies.get('jwt_token')
     
-    # check if unique_id, refresh_token and jwt_token are present in cookies else redirect to login
-    if not unique_id or not refresh_token or not jwt_token:
-        return redirect(url_for('login', next = request.url))
+#     # check if unique_id, refresh_token and jwt_token are present in cookies else redirect to login
+#     if not unique_id or not refresh_token or not jwt_token:
+#         return redirect(url_for('login', next = request.url))
     
-    # validate jwt token
-    jwt_pub_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
-    jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_pub_key)
-    if not jwt_token_valid:
-        return Response("Invalid JWT Token", 401)
+#     # validate jwt token
+#     jwt_pub_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+#     jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_pub_key)
+#     if not jwt_token_valid:
+#         return Response("Invalid JWT Token", 401)
 
-    # check if unique_id is present in redis
-    try:
-        data = rc.get(unique_id)
-    except Exception as e:
-        print("Error fetching data from redis:", e)
-        print("removing cookies")
-        return Response("Error fetching data from redis, try again later.", 500)
-    # check if email is present in data
-    email = data.get('email')
-    if not email:
-        return Response("Invalid email", 401)
+#     # check if unique_id is present in redis
+#     try:
+#         data = rc.get(unique_id)
+#     except Exception as e:
+#         print("Error fetching data from redis:", e)
+#         print("removing cookies")
+#         return Response("Error fetching data from redis, try again later.", 500)
+#     # check if email is present in data
+#     email = data.get('email')
+#     if not email:
+#         return Response("Invalid email", 401)
 
-    return Response(f"OK {email}", 200)
+#     return Response(f"OK {email}", 200)
 
 @app.route('/login')
 def login():
@@ -176,14 +176,17 @@ def callback(unique_id):
 
 @app.route('/refresh-token', methods=['POST'])
 def refresh():
+    # not checking for unique_id since it only contains optional data
+    # if data is unavaialble in redis, check mongo for data
     refresh_token = request.cookies.get('refresh_token')
     jwt_token = request.cookies.get('jwt_token')
     unique_id = request.cookies.get('unique_id')
     data = rc.get(unique_id)
-
-    if not refresh_token or not jwt_token or not unique_id or not data:
+    email_redis = None
+    if data:
+        email_redis = data.get('email')
+    if not refresh_token or not jwt_token or not unique_id:
         return Response("Invalid request", 401)
-    email = data.get('email')
 
     jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
     refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
@@ -196,7 +199,7 @@ def refresh():
     query = {'jwt-id': jwt_id, 'refresh-id': refresh_id}
     user_record = mongo_handler.fetch_one(collection, query)
     
-    if not user_record or not unique_id or not email or email != user_record.get('email'):
+    if not user_record or not unique_id:
         # invalid jwt and refresh token combination
         # or not matching emails
         # can possibly log this refresh token and username in security logs for further investigation
@@ -208,7 +211,7 @@ def refresh():
     refresh_id = str(uuid.uuid4())
     jwt_pvt_key, jwt_key_password = key_wallet.get_pvt_key(Keys.JWT_TOKEN)
     refresh_pvt_key, refresh_key_password = key_wallet.get_pvt_key(Keys.REFRESH_TOKEN)
-    jwt_token, refresh_token = JWTHandler.create_tokens(email, jwt_id, jwt_pvt_key, jwt_key_password, refresh_id, refresh_pvt_key, refresh_key_password)
+    jwt_token, refresh_token = JWTHandler.create_tokens(email_redis if email_redis else user_record['email'], jwt_id, jwt_pvt_key, jwt_key_password, refresh_id, refresh_pvt_key, refresh_key_password)
     # update jwt-id and refresh-id in mongo
     user_record['jwt-id'] = jwt_id
     user_record['refresh-id'] = refresh_id
@@ -233,14 +236,14 @@ def logout():
     refresh_token = request.cookies.get('refresh_token')
     jwt_token = request.cookies.get('jwt_token')
 
-    if not unique_id or not refresh_token or not jwt_token:
+    if refresh_token or not jwt_token:
         return Response("Invalid request", 401)
     
     # delete unique_id from redis
-    rc.delete(unique_id)
+    if unique_id: rc.delete(unique_id)
     # delete jwt_token and refresh_token from cookies
     response = make_response(redirect(url_for('login')))
-    response.set_cookie('unique_id', '', expires=0)
+    if unique_id: response.set_cookie('unique_id', '', expires=0)
     response.set_cookie('jwt_token', '', expires=0)
     response.set_cookie('refresh_token', '', expires=0)
 
