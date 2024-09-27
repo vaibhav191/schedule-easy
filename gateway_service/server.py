@@ -1,25 +1,106 @@
-from flask import Flask, request, Response, redirect, session, render_template, send_file
+from uuid import uuid4
+from flask import Flask, make_response, request, Response, redirect, session, render_template, send_file
+import jwt
 import requests
 from pymongo import MongoClient
 import os
 import gridfs
 import json
+from handlers.jwt_handler import JWTHandler
+from handlers.key_handler import KeyHandler
+from handlers.redis_handler import RedisHandler
+from flask import url_for
+from flask import redirect
+from flask import request
+from flask import send_file
+from flask import session
+from flask import render_template
+from models.keys import Keys
+from models.key_types import KeyTypes
+
+rc = RedisHandler()
+key_wallet = KeyHandler()
 
 server = Flask(__name__, template_folder='templates', static_folder='static')
 
+# we need redis,mongo, keywallet, jwt_handler, gridfs, requests
+auth_service_url = os.getenv('AUTH_SERVICE_URL', 'auth_service')
+auth_service_port = os.getenv('AUTH_SERVICE_PORT', '5000')
+auth_url = f"http://{auth_service_url}:{auth_service_port}"
+login_endpoint = "/login"
+refresh_endpoint = "/refresh-token"
+logout_endpoint = "/logout"
+
+msg_service_url = os.getenv('MSG_SERVICE_URL', 'msg_service')
+msg_service_port = os.getenv('MSG_SERVICE_PORT', '9989')
+
+
+def validate_tokens(f):
+    def wrapper(*args, **kwargs):
+        print("Validating tokens.")
+        # check if session has jwt, refresh token, unique id
+        refresh_token = request.cookies.get('refresh_token')
+        jwt_token = request.cookies.get('jwt_token')
+        unique_id = request.cookies.get('unique_id')
+        # Do we need to check for unique_id? since redis is optional storage
+        # if we do not have unique_id available just use mongo for data instead
+        
+        if not refresh_token or not jwt_token:
+            return redirect(auth_url + login_endpoint)
+        # check if jwt is valid
+        print("Checking if jwt is valid.")
+        jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+        jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_key)
+        print("JWT Valid:", jwt_token_valid)
+        print("Unique ID check:", unique_id)
+        if not unique_id:
+            print("Unique ID not found, setting.")
+            email = jwt.decode(jwt_token, jwt_key, algorithms=['RS256'], verify=False)['sub']
+            unique_id = str(uuid4())
+            rc.set(unique_id, email)
+        print("Unique ID:", unique_id)
+        if not jwt_token_valid:
+            print("JWT token not valid.")
+            # if not valid, check if refresh token is valid
+            refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
+            refresh_token_valid = JWTHandler.validate_jwt_token(refresh_token, refresh_key)
+            if not refresh_token_valid:
+                print("Refresh token not valid.")
+                return redirect(auth_url + login_endpoint)
+            
+            # if refresh token is valid, call refresh token endpoint
+            print("Calling refresh token endpoint.")
+            response = requests.post(auth_url + refresh_endpoint)
+            print("Refresh token response:", response)
+            if response.status_code != 200:
+                return redirect(auth_url + login_endpoint)
+
+            new_jwt_token = response.cookies.get('jwt_token')
+            new_refresh_token = response.cookies.get('refresh_token')
+            response = make_response(redirect(url_for(f.__name__)))
+            # set new jwt token and refresh token in cookies
+            response.set_cookie('jwt_token', new_jwt_token)
+            response.set_cookie('refresh_token', new_refresh_token)
+            response.set_cookie('unique_id', unique_id)
+            return response
+        return f(*args, **kwargs)
+    return wrapper
+
 @server.route("/", methods = ["GET"])
 def home():
-    if session:
-        return redirect("/main")
-    return render_template("home.html")
+    # when we come to home, show them the home screen
+    # send them to main screen if they have valid jwt token, refresh token and unique_id
+    if not request.cookies.get('jwt_token') or not request.cookies.get('refresh_token') or not request.cookies.get('unique_id'):
+        return render_template("home.html")
 
 @server.route("/main", methods=["GET"])
+@validate_tokens
 def main():
-    if not session:
-        return redirect("http://127.0.0.1:8080/")
+    unique_id = request.cookies.get('unique_id')
+    email = rc.get(unique_id)
     data = [
         {
-            'email': session['email']
+            'email': email
         }
     ]
     return render_template('main.html', data = data)
