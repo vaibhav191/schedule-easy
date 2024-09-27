@@ -6,7 +6,7 @@ from pymongo import MongoClient
 import os
 import gridfs
 import json
-from gateway_service.handlers.mongo_handler import MongoDBHandler
+from handlers.mongo_handler import MongoDBHandler
 from handlers.jwt_handler import JWTHandler
 from handlers.key_handler import KeyHandler
 from handlers.redis_handler import RedisHandler
@@ -26,8 +26,8 @@ mongo_handler = MongoDBHandler()
 server = Flask(__name__, template_folder='templates', static_folder='static')
 
 # we need redis,mongo, keywallet, jwt_handler, gridfs, requests
-auth_service_address = os.getenv('AUTH_SERVICE_ADDRESS', 'auth_service')
-auth_service_port = os.getenv('AUTH_SERVICE_PORT', '5000')
+auth_service_address = os.getenv('AUTH_ADDRESS', 'auth_service')
+auth_service_port = os.getenv('AUTH_PORT', '5000')
 auth_service_url = f"http://{auth_service_address}:{auth_service_port}"
 login_endpoint = "/login"
 refresh_endpoint = "/refresh-token"
@@ -95,6 +95,7 @@ def home():
     # send them to main screen if they have valid jwt token, refresh token and unique_id
     if not request.cookies.get('jwt_token') or not request.cookies.get('refresh_token') or not request.cookies.get('unique_id'):
         return render_template("home.html")
+    return redirect(url_for('main'))
 
 @server.route("/main", methods=["GET"])
 @validate_tokens
@@ -149,8 +150,9 @@ def consume():
 
 @server.route("/login", methods = ["GET"])
 def login():
-    return redirect(url_for('main'))
+    return redirect(auth_service_url + login_endpoint)
 
 if __name__ == "__main__":
-    server.secret_key = "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"
-    server.run(host="127.0.0.1", port = 8080) 
+    print(os.environ)
+    server.secret_key = os.getenv('SESSION_SECRET')
+    server.run(host="0.0.0.0", port = os.getenv('GATEWAY_PORT'))
