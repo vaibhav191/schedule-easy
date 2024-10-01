@@ -168,7 +168,7 @@ def consume():
 @server.route("/login", methods = ["GET"])
 def login():
     server.logger.debug("Login route.")
-    server.logger.denig("Request host: %s", request.host)
+    server.logger.debug("Request host: %s", request.host)
     if request.cookies.get('jwt_token') and request.cookies.get('refresh_token'):
         return redirect(url_for('main'))
     if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
