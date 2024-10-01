@@ -1,3 +1,4 @@
+from logging import Logger
 import os
 import json
 from redis import Redis, client
@@ -14,16 +15,24 @@ class RedisHandler:
     def get_client(self) -> client.Redis:
         return self.redis_client
 
-    def set(self, key: str, data: Union[str, Dict]) -> bool:
+    def set(self, key: str, data: Union[str, Dict], logger: Logger) -> bool:
+        if not data:
+            logger.debug(f"Redis set Data is empty")
+            raise ValueError("Data cannot be empty")
         data = json.dumps(data)
-        print("Redis set Data:", data)
+        logger.debug(f"Redis set Data: {data}")
         return self.redis_client.set(key, data)
     
-    def get(self, key: Union[str, Dict]) -> Union[str, Dict[str, str]]:
-        print("Redis get key:", key)
+    def get(self, key: Union[str, Dict], logger:Logger) -> Union[str, Dict[str, str]]:
+        logger.debug(f"Redis get key: {key}")
+        if not key:
+            logger.debug(f"Redis get Key is empty")
+            raise ValueError("Key cannot be empty")
         data = self.redis_client.get(key)
+        if not data:
+            return None
         data = json.loads(data)
-        print("Redis Data received:", data)
+        logger.debug(f"Redis Data received: {data}")
         return data
     
     def delete(self, key) -> None:

@@ -27,7 +27,7 @@ class JWTHandler:
         try:
             data = jwt.decode(jwt_token, jwt_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
             if data['tkn'] != "auth token":
-                logger.debug(f"{__class__.__name__}: Invalid token type, expected auth token, received:", data['tkn'])
+                logger.debug(f"{__class__.__name__}: Invalid token type, expected auth token, received: {data['tkn']}")
                 return False
         except jwt.ExpiredSignatureError:
             logger.debug(f"{__class__.__name__}: Session Expired")
@@ -48,7 +48,7 @@ class JWTHandler:
         try:
             data = jwt.decode(refresh_token, refresh_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
             if data['tkn'] != "refresh token":
-                logger.debug(f"{__class__.__name__}: Invalid token type, expected refresh token, received:", data['tkn'])
+                logger.debug(f"{__class__.__name__}: Invalid token type, expected refresh token, received: {data['tkn']}")
                 return False
         except jwt.ExpiredSignatureError:
             logger.debug(f"{__class__.__name__}: Session Expired")

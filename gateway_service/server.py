@@ -30,10 +30,11 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s 
 
 print(os.environ)
 # we need redis,mongo, keywallet, jwt_handler, gridfs, requests
-auth_service_address = os.getenv('AUTH_ADDRESS')
-server.logger.debug(f"{FUNCTIONNAME.__name__}: Auth service address: %s", auth_service_address)
+auth_service_address = 'auth_service' 
+# server.logger.debug(f"Auth service address: %s", auth_service_address)
 auth_service_port = os.getenv('AUTH_PORT', '5000')
 auth_service_url = f"http://{auth_service_address}:{auth_service_port}"
+logging.debug(f"Auth service URL: {auth_service_url}")
 login_endpoint = "/login"
 refresh_endpoint = "/refresh-token"
 logout_endpoint = "/logout"
@@ -45,41 +46,47 @@ publish_event_endpoint = "/publish_event"
 
 def validate_tokens(f):
     def wrapper(*args, **kwargs):
-        server.logger.debug(f"{wrapper.__name__}: Validating tokens.")
+        server.logger.debug(f"{validate_tokens.__name__}: Validating tokens.")
         # check if session has jwt, refresh token, unique id
+        server.logger.debug(f"{wrapper.__name__}: Request: {request.host}")
         refresh_token = request.cookies.get('refresh_token')
+        server.logger.debug(f"{wrapper.__name__}: Refresh Token: {refresh_token if refresh_token else 'Not Found'}")
         jwt_token = request.cookies.get('jwt_token')
+        server.logger.debug(f"{wrapper.__name__}: JWT Token: {jwt_token if jwt_token else 'Not Found'}")
         unique_id = request.cookies.get('unique_id')
+        server.logger.debug(f"{wrapper.__name__}: Unique ID: {unique_id if unique_id else 'Not Found'}")
         # Do we need to check for unique_id? since redis is optional storage
         # if we do not have unique_id available just use mongo for data instead
-        server.logger.debug(f"{wrapper.__name__}: Request: %s", request.host)
         if not refresh_token or not jwt_token:
             return redirect(url_for('login'))
         # check if jwt is valid
         server.logger.debug(f"{wrapper.__name__}: Checking if jwt is valid.")
         jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
-        jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_key)
-        server.logger.debug(f"{wrapper.__name__}: JWT Valid: %s", jwt_token_valid)
-        server.logger.debug(f"{wrapper.__name__}: Unique ID check: %s", unique_id)
+        jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_key, server.logger)
+        server.logger.debug(f"{wrapper.__name__}: JWT Valid: {jwt_token_valid}")
+        server.logger.debug(f"{wrapper.__name__}: Unique ID check: {unique_id}")
         if not unique_id:
             server.logger.debug(f"{wrapper.__name__}: Unique ID not found, setting.")
             email = jwt.decode(jwt_token, jwt_key, algorithms=['RS256'], verify=False)['sub']
             unique_id = str(uuid4())
             rc.set(unique_id, email)
-        server.logger.debug(f"{wrapper.__name__}: Unique ID: %s", unique_id)
+        server.logger.debug(f"{wrapper.__name__}: Unique ID: {unique_id}")
         if not jwt_token_valid:
             server.logger.debug(f"{wrapper.__name__}: JWT token not valid.")
             # if not valid, check if refresh token is valid
             refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
-            refresh_token_valid = JWTHandler.validate_jwt_token(refresh_token, refresh_key)
+            refresh_token_valid = JWTHandler.validate_refresh_token(refresh_token, refresh_key, server.logger)
             if not refresh_token_valid:
                 server.logger.debug(f"{wrapper.__name__}: Refresh token not valid.")
                 return redirect(url_for('login'))
             
             # if refresh token is valid, call refresh token endpoint
             server.logger.debug(f"{wrapper.__name__}: Calling refresh token endpoint.")
-            response = requests.post(auth_service_url + refresh_endpoint)
-            server.logger.debug(f"{wrapper.__name__}: Refresh token response: %s", response)
+            server.logger.debug(f"{wrapper.__name__}: calling refresh token endpoint: {auth_service_url + refresh_endpoint}")
+            cookies = {'refresh_token': refresh_token, 'unique_id': unique_id, 'jwt_token': jwt_token}
+            server.logger.debug(f"{wrapper.__name__}: Using cookies: {cookies}")
+            response = requests.post(auth_service_url + refresh_endpoint, cookies=cookies)
+            server.logger.debug(f"{wrapper.__name__}: Refresh token response: {response}")
             if response.status_code != 200:
                 return redirect(url_for('login'))
 
@@ -101,24 +108,23 @@ def home():
     refresh_token = request.cookies.get('refresh_token')
     unique_id = request.cookies.get('unique_id')
     server.logger.debug(f"{home.__name__}: Home route.")
-    server.logger.debug(f"{home.__name__}: JWT Token: %s", jwt_token)
-    server.logger.debug(f"{home.__name__}: Refresh Token: %s", refresh_token)
-    server.logger.debug(f"{home.__name__}: Unique ID: %s", unique_id)
+    server.logger.debug(f"{home.__name__}: JWT Token: {jwt_token}")
+    server.logger.debug(f"{home.__name__}: Refresh Token: {refresh_token}")
+    server.logger.debug(f"{home.__name__}: Unique ID: {unique_id}")
     # when we come to home, show them the home screen
     # send them to main screen if they have valid jwt token, refresh token and unique_id
     if jwt_token and refresh_token and unique_id:
-        server.logger.debug(f"{home.__name__}: server.url.map: %s", server.url_map)
         server.logger.debug(f"{home.__name__}: Redirecting to main.")
         return redirect(url_for('main'))
     return render_template("home.html")
 
-@validate_tokens
 @server.route("/main", methods=["GET"])
+@validate_tokens
 def main():
     server.logger.debug(f"{main.__name__}: Main route.")
     unique_id = request.cookies.get('unique_id')
     redis_data = rc.get(unique_id)
-    server.logger.debug(f"{main.__name__}: Redis data: %s", redis_data)
+    server.logger.debug(f"{main.__name__}: Redis data: {redis_data}")
     return render_template('main.html', email = redis_data['email'])
 
 @server.route("/download", methods=["GET"])
@@ -163,11 +169,9 @@ def consume():
 @server.route("/login", methods = ["GET"])
 def login():
     server.logger.debug(f"{login.__name__}: Login route.")
-    server.logger.debug(f"{login.__name__}: Request host: %s", request.host)
-    if request.cookies.get('jwt_token') and request.cookies.get('refresh_token'):
-        return redirect(url_for('main'))
+    server.logger.debug(f"{login.__name__}: Request host: {request.host}")
     if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
-        return redirect(f"{auth_service_url}{login_endpoint}?next=/main")
+        return redirect(f"http://127.0.0.1:5000/{login_endpoint}?next=/main")
     return redirect(auth_service_url + login_endpoint + "?next=/main")
 
 if __name__ == "__main__":
