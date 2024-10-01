@@ -9,4 +9,4 @@ COPY . /app
 
 EXPOSE 7070
 
-CMD ["python3", "crypto_service.py"]
+CMD ["python3","-u", "crypto_service.py"]

@@ -75,9 +75,10 @@ def login():
     unique_id = str(uuid.uuid4())
     credgen = CredsGenerator(scope)
     credgen.authorize(unique_id)
-    
+    print("request args:", request.args)
     data = {'state': credgen.state, 'request_url': request.args.get('next')}
-    
+    print()
+    print("Data:", data) 
     rc = RedisHandler()
     rc.set(unique_id, data)
     
@@ -167,7 +168,7 @@ def callback(unique_id):
     print("User record:", user_record)
     print("Post ID:", post_id)
     print("Unique ID:", unique_id)
-    response = make_response(redirect(request_url))
+    response = make_response(redirect("http://127.0.0.1:8080"+request_url))
     response.set_cookie('unique_id',unique_id, httponly=True)
     response.set_cookie('jwt_token', jwt_token, httponly=True)
     response.set_cookie('refresh_token', refresh_token, httponly=True)

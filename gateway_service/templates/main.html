@@ -15,11 +15,15 @@
                 <img class = "img-fluid" src="../static/calendar_nav.png" alt="calendar">
                     Calendar Sync
             </div>
-            <button id="login" type="button" class="btn  btn-light" onclick="">
-                {%for item in data%}
-                    {{item.email}}
-                {% endfor %}
-            </button>
+            <!-- Ensure the login and email buttons are aligned together in a corner -->
+            <div class="d-flex justify-content-end">
+                <button id="login" type="button" class="btn  btn-light" onclick="">
+                    {{email}}
+                </button>
+                <button id="logout" type="button" class="btn btn-danger" onclick="window.location.href='/logout'">
+                    Logout
+                </button>
+            </div>
         </div>    
     </div>
     <div class="container-fluid">
