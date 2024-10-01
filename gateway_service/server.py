@@ -1,3 +1,6 @@
+"""
+    - Get msg_service up and running and then work on upload endpoint
+"""
 from uuid import uuid4
 from flask import Flask, make_response, request, Response, redirect, session, render_template, send_file
 import jwt
@@ -125,6 +128,7 @@ def main():
     return render_template('main.html', email = redis_data['email'])
 
 @server.route("/download", methods=["GET"])
+@validate_tokens
 def download():
     return send_file('static/event_template.xlsx', as_attachment = True)
 

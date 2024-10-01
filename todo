@@ -1,6 +1,12 @@
-1. Implement MongoDB handler and RedisHandler in case its not done
-2. Implement Encryption of Credentials then storage to MongoDB along with other necessary user data
-3. Convertion Unique_id to session_id in auth_service
-4. Change EC to RSA encryption, store secrets in a different folder /secrets
-5. Implement encrypt and decrypt for the encryption to work on jwt and credentials
-6. implement jwt
+[X] - Implement MongoDB handler and RedisHandler in case its not done
+[X] - Implement Encryption of Credentials then storage to MongoDB along with other necessary user data
+[ ] - Convertion Unique_id to session_id in auth_service
+[X] - Change EC to RSA encryption, store secrets in a different folder /secrets
+[X] - Implement encrypt and decrypt for the encryption to work on jwt and credentials
+[X] - implement jwt
+[ ] - Pending Services:
+    [ ] - gateway_service
+            - Implement upload once msg_service is done 
+    [ ] - event_service
+    [ ] - msg_service
+    [ ] - notification_service
