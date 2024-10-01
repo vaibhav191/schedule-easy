@@ -27,19 +27,19 @@ class JWTHandler:
         try:
             data = jwt.decode(jwt_token, jwt_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
             if data['tkn'] != "auth token":
-                logger.debug("Invalid token type, expected auth token, received:", data['tkn'])
+                logger.debug(f"{__class__.__name__}: Invalid token type, expected auth token, received:", data['tkn'])
                 return False
         except jwt.ExpiredSignatureError:
-            logger.debug("Session Expired")
+            logger.debug(f"{__class__.__name__}: Session Expired")
             return False
         except jwt.InvalidAudienceError:
-            logger.debug("Invalid Audience")
+            logger.debug(f"{__class__.__name__}: Invalid Audience")
             return False
         except jwt.InvalidIssuerError:
-            logger.debug("Invalid Issuer")
+            logger.debug(f"{__class__.__name__}: Invalid Issuer")
             return False
         except jwt.InvalidIssuedAtError:
-            logger.debug("Invalid Issued At")
+            logger.debug(f"{__class__.__name__}: Invalid Issued At")
             return False
         return True
 
@@ -48,18 +48,18 @@ class JWTHandler:
         try:
             data = jwt.decode(refresh_token, refresh_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
             if data['tkn'] != "refresh token":
-                logger.debug("Invalid token type, expected refresh token, received:", data['tkn'])
+                logger.debug(f"{__class__.__name__}: Invalid token type, expected refresh token, received:", data['tkn'])
                 return False
         except jwt.ExpiredSignatureError:
-            logger.debug("Session Expired")
+            logger.debug(f"{__class__.__name__}: Session Expired")
             return False
         except jwt.InvalidIssuerError:
-            logger.debug("Invalid Issuer")
+            logger.debug(f"{__class__.__name__}: Invalid Issuer")
             return False
         except jwt.InvalidIssuedAtError:
-            logger.debug("Invalid Issued At")
+            logger.debug(f"{__class__.__name__}: Invalid Issued At")
             return False
         except jwt.InvalidAudienceError:
-            logger.debug("Invalid Audience")
+            logger.debug(f"{__class__.__name__}: Invalid Audience")
             return False
         return True
