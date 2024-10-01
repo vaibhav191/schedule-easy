@@ -19,13 +19,14 @@ Google Oauth Mechanism
     -> leverage token to generate  and send JWT token and a refresh token for the user.
     -> Send user back to request url with the token.
 '''
+import logging
 import os, base64, json
 from typing import List, Dict
 from flask import redirect, request, url_for
 from google.oauth2.credentials import Credentials
 import google_auth_oauthlib.flow
 from handlers.kms_handler import KMSHandler
-from logging import Logger
+import logging
 
 class CredsGenerator:
     def __init__(self, scopes: List) -> None:
@@ -38,6 +39,8 @@ class CredsGenerator:
         kms = KMSHandler()
         self.CLIENT_SECRETS: str = kms.decrypt(encrypted_app_cred_bytes).decode('utf-8')
         self.CLIENT_SECRETS: Dict[str: str] = json.loads(self.CLIENT_SECRETS)
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
 
     def authorize(self, unique_id) -> None: 
         # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps.
@@ -57,7 +60,7 @@ class CredsGenerator:
         # Enable incremental authorization. Recommended as a best practice.
         include_granted_scopes='true')
 
-        Logger.debug(f"{CredsGenerator.__name__}, {CredsGenerator.authorize.__name__} authorization_URL: {self.authorization_url}")
+        self.logger.debug(f"{CredsGenerator.__name__}, {CredsGenerator.authorize.__name__} authorization_URL: {self.authorization_url}")
         return redirect(self.authorization_url)
     
     def callback(self, state, unique_id) -> Credentials:

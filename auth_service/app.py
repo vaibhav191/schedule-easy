@@ -140,12 +140,6 @@ def callback(unique_id):
 
     return response
 
-'''
-To Do:
-1. There seems to be some sort of mismatch between jwtid and refresh id leading to user record not being found in mongo.
-This is causing it to return 401 causing fresh login sequence instead of refresh token generation.
-Need to investigate further.
-'''
 @app.route('/refresh-token', methods=['POST'])
 def refresh():
     # not checking for unique_id since it only contains optional data
@@ -180,6 +174,7 @@ def refresh():
     db = mongo_handler.get_client('auth') 
     collection = mongo_handler.get_collection(db, 'user_data')
     query = {'jwt-id': jwt_id, 'refresh-id': refresh_id}
+    app.logger.debug(f"{refresh.__name__}: Query: {query}")
     user_record = mongo_handler.fetch_one(collection, query)
     app.logger.debug(f"{refresh.__name__}: User record: {user_record}") 
     if not user_record:
@@ -190,20 +185,20 @@ def refresh():
         return Response("Invalid JWT and Refresh Token combination", 401)
 
     # create new jwt token and refresh token
-    jwt_id = str(uuid.uuid4())
+    jwt_id_new = str(uuid.uuid4())
     app.logger.debug(f"{refresh.__name__}: Creating new jwt id: {jwt_id}")
-    refresh_id = str(uuid.uuid4())
+    refresh_id_new = str(uuid.uuid4())
     app.logger.debug(f"{refresh.__name__}: Creating new refresh id: {refresh_id}")
     app.logger.debug(f"{refresh.__name__}: Creating new jwt and refresh tokens")
     jwt_pvt_key, jwt_key_password = key_wallet.get_pvt_key(Keys.JWT_TOKEN)
     refresh_pvt_key, refresh_key_password = key_wallet.get_pvt_key(Keys.REFRESH_TOKEN)
-    jwt_token, refresh_token = JWTHandler.create_tokens(email if email else user_record['email'], jwt_id, jwt_pvt_key, jwt_key_password, refresh_id, refresh_pvt_key, refresh_key_password)
+    jwt_token, refresh_token = JWTHandler.create_tokens(email if email else user_record['email'], jwt_id_new, jwt_pvt_key, jwt_key_password, refresh_id_new, refresh_pvt_key, refresh_key_password)
     app.logger.debug(f"{refresh.__name__}: JWT Token: {jwt_token[:10]}")
-    app.logger.debug(f"{refresh.__name__}: Refresh Token: {refresh_token}")
+    app.logger.debug(f"{refresh.__name__}: Refresh Token: {refresh_token[:10]}")
     # update jwt-id and refresh-id in mongo
     app.logger.debug(f"{refresh.__name__}: Updating user record in mongo")
-    user_record['jwt-id'] = jwt_id
-    user_record['refresh-id'] = refresh_id
+    user_record['jwt-id'] = jwt_id_new
+    user_record['refresh-id'] = refresh_id_new
     user_record['last-update'] = datetime.datetime.now(datetime.timezone.utc)
     # update last-update in mongo
     post_id = mongo_handler.update_one(collection, query, user_record)
@@ -218,7 +213,7 @@ def refresh():
     response.set_cookie('jwt_token', jwt_token, httponly=True)
     response.set_cookie('refresh_token', refresh_token, httponly=True)
     # return response
-    return response
+    return response, 200
 
 @app.route('/logout', methods=['POST'])
 def logout():
@@ -226,7 +221,7 @@ def logout():
     refresh_token = request.cookies.get('refresh_token')
     jwt_token = request.cookies.get('jwt_token')
     app.logger.debug(f"{logout.__name__}: Unique ID: {unique_id}")
-    app.logger.debug(f"{logout.__name__}: Refresh Token: {refresh_token}")
+    app.logger.debug(f"{logout.__name__}: Refresh Token: {refresh_token[:10]}")
     app.logger.debug(f"{logout.__name__}: JWT Token: {jwt_token[:10]}")
     
     if refresh_token or not jwt_token:

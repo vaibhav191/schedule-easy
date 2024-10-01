@@ -83,7 +83,7 @@ def validate_tokens(f):
             cookies = {'refresh_token': refresh_token, 'unique_id': unique_id, 'jwt_token': jwt_token}
             server.logger.debug(f"{wrapper.__name__}: Using cookies: {cookies}")
             response = requests.post(auth_service_url + refresh_endpoint, cookies=cookies)
-            server.logger.debug(f"{wrapper.__name__}: Response Statuc: {response.status_code}, Refresh token response: {response}")
+            server.logger.debug(f"{wrapper.__name__}: Response Statuc: {response.status_code}, Refresh content: {response.content}")
             if response.status_code != 200:
                 return redirect(url_for('login'))
 
@@ -94,7 +94,7 @@ def validate_tokens(f):
             response.set_cookie('jwt_token', new_jwt_token)
             response.set_cookie('refresh_token', new_refresh_token)
             response.set_cookie('unique_id', unique_id)
-            return response
+            return response, 200
         return f(*args, **kwargs)
     wrapper.__name__ = f.__name__
     return wrapper
@@ -106,7 +106,7 @@ def home():
     unique_id = request.cookies.get('unique_id')
     server.logger.debug(f"{home.__name__}: Home route.")
     server.logger.debug(f"{home.__name__}: JWT Token: {jwt_token}")
-    server.logger.debug(f"{home.__name__}: Refresh Token: {refresh_token}")
+    server.logger.debug(f"{home.__name__}: Refresh Token: {refresh_token[:10]}")
     server.logger.debug(f"{home.__name__}: Unique ID: {unique_id}")
     # when we come to home, show them the home screen
     # send them to main screen if they have valid jwt token, refresh token and unique_id
@@ -129,6 +129,7 @@ def download():
     return send_file('static/event_template.xlsx', as_attachment = True)
 
 @server.route("/upload", methods=["POST"])
+@validate_tokens
 def upload():
     try:
         # Get the uploaded file from the request
@@ -167,8 +168,23 @@ def consume():
 def login():
     server.logger.debug(f"{login.__name__}: Login route.")
     server.logger.debug(f"{login.__name__}: Request host: {request.host}")
+    # check for existing jwt token and refresh token validity
+    jwt_token = request.cookies.get('jwt_token')
+    refresh_token = request.cookies.get('refresh_token')
+    unique_id = request.cookies.get('unique_id')
+    server.logger.debug(f"{login.__name__}: JWT Token: {jwt_token[:10]}")
+    server.logger.debug(f"{login.__name__}: Refresh Token: {refresh_token[:10]}")
+    server.logger.debug(f"{login.__name__}: Unique ID: {unique_id}")
+    jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+    refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
+    if jwt_token and refresh_token:
+        jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_key, server.logger)
+        refresh_token_valid = JWTHandler.validate_refresh_token(refresh_token, refresh_key, server.logger)
+        if jwt_token_valid and refresh_token_valid:
+            server.logger.debug(f"{login.__name__}: Login not required, tokens are valid. Redirecting to main.")
+            return redirect(url_for('main'))
     if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
-        return redirect(f"http://127.0.0.1:5000/{login_endpoint}?next=/main")
+        return redirect(f"http://127.0.0.1:5000{login_endpoint}?next=/main")
     return redirect(auth_service_url + login_endpoint + "?next=/main")
 
 if __name__ == "__main__":

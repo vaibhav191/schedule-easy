@@ -1,4 +1,5 @@
 import base64
+import logging
 import requests
 import cryptography.hazmat.primitives.serialization as serialization
 import cryptography.hazmat.primitives.hashes as hashes
@@ -9,7 +10,7 @@ from models.keys import Keys
 from models.key_types import KeyTypes
 import os
 from typing import Tuple
-from logging import Logger
+import logging
 class CryptoHandler:
     """
     CryptoHandler class provides methods to handle cryptographic operations such as key retrieval, encryption, and decryption.
@@ -87,11 +88,13 @@ class CryptoHandler:
         Keys.REDIS_ENCRYPTION: {KeyTypes.symmetric},
     }
 
+    logger = logging.getLogger('CryptoHandler')
+    logger.setLevel(logging.DEBUG)
     def __init__(self):
         self.Crypto_host = os.getenv('CRYPTO_HOST', 'crypto_service')
         self.Crypto_port = os.getenv('CRYPTO_PORT', '7070')
 
-    def get_public_key(self, key_name: Keys) -> bytes:
+    def get_public_key(self, key_name: Keys ) -> bytes:
         """
         Retrieves the public key for the given key name from the crypto service.
         Args:
@@ -112,12 +115,10 @@ class CryptoHandler:
                     }
         response = requests.post(url, json = {'key_details': key_details})
         if response.status_code == 200:
-            Logger.debug(f"Key received from crypto service, response: {response.content}")
             if key_name.name in response.json():
                 key_b64 = response.json()[key_name.name]
                 return base64.b64decode(key_b64)
         else:
-            Logger.debug(f"Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")
             raise Exception("Failed to get key from crypto service")
     
     def get_private_key(self,key_name: Keys) -> Tuple[bytes, bytes]:
@@ -146,12 +147,11 @@ class CryptoHandler:
         elif key_name == Keys.JWT_TOKEN:
             endpoint = '/get-jwt-pvt-key'
         else:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_private_key.__name__}, Invalid key_name: {key_name}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_private_key.__name__}, Invalid key_name: {key_name}")
             raise Exception("Invalid key_name")    
         url = f"http://{self.Crypto_host}:{self.Crypto_port}" + endpoint
         response = requests.post(url)
         if response.status_code == 200:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_private_key.__name__}, Key received from crypto service, response: {response.content}") 
             if key_name.name in response.json():
                 key_b64 = response.json()[key_name.name]
                 key = base64.b64decode(key_b64)
@@ -161,7 +161,7 @@ class CryptoHandler:
                     password = base64.b64decode(password_b64) 
                 return key, password
         else:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_private_key.__name__}, Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_private_key.__name__}, Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")
             raise Exception("Failed to get key from crypto service")
 
     def get_symmetric_key(self, key_name: Keys) -> bytes:
@@ -189,12 +189,11 @@ class CryptoHandler:
         key_details = {'key_name': key_name.name}
         response = requests.post(url, params = {'key_details': key_details})
         if response.status_code == 200:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_symmetric_key.__name__}, Key received from crypto service, response: {response.content}")  
             if key_name.name in response.json():
                 key_b64 = response.json()[key_name.name]
                 return base64.b64decode(key_b64)
         else:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_symmetric_key.__name__}, Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")    
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.get_symmetric_key.__name__}, Failed to get key from crypto service, response: {response.content}, status code: {response.status_code}")    
             raise Exception("Failed to get key from crypto service")
 
     @staticmethod
@@ -221,12 +220,12 @@ class CryptoHandler:
         try:
             public_key = serialization.load_pem_public_key(key)
         except Exception as e:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Public key serialization failed, check key: {e}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Public key serialization failed, check key: {e}")
             raise Exception("Public key serialization failed, check key")
         if len(data) <= 190:
             try:
-                Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Data: {data}")    
-                Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Key: {key}")
+                CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Data: {data}")    
+                CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Key: {key}")
                 ciphertext = public_key.encrypt(
                     data,
                     padding.OAEP(
@@ -236,13 +235,13 @@ class CryptoHandler:
                     )
                 )
             except Exception as e:
-                Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Encryption failed, check data: {e}")
+                CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Encryption failed, check data: {e}")
                 raise Exception("Failed to encrypt data. Check data.")
 
             return ciphertext
         try:
-            Logger.bebug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Data: {data}")
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Key: {key}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Data: {data}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Key: {key}")
             ciphertext = b''
             for i in range(0, len(data), 190):
                 chunk = data[i:i+190]
@@ -255,7 +254,7 @@ class CryptoHandler:
                     )
                 )
         except Exception as e:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Encryption failed, check data: {e}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_encrypt.__name__}, Encryption failed, check data: {e}")
             raise Exception("Failed to encrypt data. Check data.")
         return ciphertext
 
@@ -276,22 +275,22 @@ class CryptoHandler:
         """
         
         if not key_name or type(key_name) is not Keys or key_name not in {Keys.OAUTH_CREDENTIALS, Keys.JWT_TOKEN, Keys.REFRESH_TOKEN}:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Invalid key_name: {key_name}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Invalid key_name: {key_name}")
             raise Exception("Invalid key_name")
         if type(ciphertext) is not bytes:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Ciphertext must be of type bytes: {type(ciphertext)}")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Ciphertext must be of type bytes: {type(ciphertext)}")
             raise Exception("Data must be of type bytes")
         if KeyTypes.pvt not in CryptoHandler.key_types[key_name]:
-            Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Private key not available for the given key_name")
+            CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Private key not available for the given key_name")
             raise Exception("Private key not available for the given key_name")
 
         ciphertext_b64 = base64.b64encode(ciphertext).decode('utf-8')
 
         url = f"http://{self.Crypto_host}:{self.Crypto_port}/decrypt"
         key_details = {'key_name': key_name.name, 'ciphertext': ciphertext_b64}
-        Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Key Details: {key_details}")
+        CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Key Details: {key_details}")
         response = requests.post(url, json = key_details)
-        Logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Response: {response.content}, {response.status_code}")
+        CryptoHandler.logger.debug(f"{CryptoHandler.__class__}, {CryptoHandler.asymm_decrypt.__name__}, Response: {response.content}, {response.status_code}")
         if len(ciphertext) <= 256:
             if response.status_code == 200:
                 if 'plaintext' in response.json():
