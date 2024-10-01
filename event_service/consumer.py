@@ -1,3 +1,4 @@
+from flask import Response
 import pika
 import pandas as pd
 from pymongo import MongoClient
@@ -59,7 +60,6 @@ def event_consumer(ch, method, properties, body):
     client = MongoClient("mongodb://localhost:27017")
     event_req_coll = client['event_automation']
     if not client:
-        
         return Response("Mongo client not found", 500)
     fs = gridfs.GridFS(event_req_coll) 
     # get file content from mongo
@@ -70,13 +70,14 @@ def event_consumer(ch, method, properties, body):
     df_result = create_events(cred, df)
     df_result.drop(columns = [df.columns[0]], inplace = True)
     file_name = "Event_results_" + str(uuid4()) + '.xlsx'
-    df_result.to_excel(file_name)
     
+    # To do - convert dataframe to dict and save in mongo db instead of saving in file
+    
+    df_result.to_excel(file_name)
     # upload result in mongodb
     client = MongoClient("mongodb://localhost:27017")
     event_req_coll = client['event_automation']
     if not client:
-        
         return Response("Mongo client not found", 500)
     fs = gridfs.GridFS(event_req_coll) 
     # delete temp file created
