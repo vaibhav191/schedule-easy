@@ -50,13 +50,11 @@ class RabbitMQ:
 @server.route('/publish_event', methods = ['POST'])
 def event_publisher():
     if not request:
-        print("no request:", request)
         return Response("No request found", status = 500)
     payload = request.get_json()
     fid = payload['fid']
     jwt = payload['jwt']
     email = payload['email']
-    print(fid)
     rabbitmq = RabbitMQ()
     rabbitmq.publish(queue_name = "eventQ", message = json.dumps({'fid':fid, 'jwt': jwt, 'email': email}))
     rabbitmq.close()

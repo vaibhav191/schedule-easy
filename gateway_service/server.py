@@ -28,10 +28,8 @@ mongo_handler = MongoDBHandler()
 server = Flask(__name__, template_folder='templates', static_folder='static')
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-print(os.environ)
 # we need redis,mongo, keywallet, jwt_handler, gridfs, requests
 auth_service_address = 'auth_service' 
-# server.logger.debug(f"Auth service address: %s", auth_service_address)
 auth_service_port = os.getenv('AUTH_PORT', '5000')
 auth_service_url = f"http://{auth_service_address}:{auth_service_port}"
 logging.debug(f"Auth service URL: {auth_service_url}")
@@ -50,20 +48,15 @@ def validate_tokens(f):
         # check if session has jwt, refresh token, unique id
         server.logger.debug(f"{wrapper.__name__}: Request: {request.host}")
         refresh_token = request.cookies.get('refresh_token')
-        server.logger.debug(f"{wrapper.__name__}: Refresh Token: {refresh_token if refresh_token else 'Not Found'}")
+        server.logger.debug(f"{wrapper.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
         jwt_token = request.cookies.get('jwt_token')
-        server.logger.debug(f"{wrapper.__name__}: JWT Token: {jwt_token if jwt_token else 'Not Found'}")
+        server.logger.debug(f"{wrapper.__name__}: JWT Token: {jwt_token[:10] if jwt_token else 'Not Found'}")
         unique_id = request.cookies.get('unique_id')
         server.logger.debug(f"{wrapper.__name__}: Unique ID: {unique_id if unique_id else 'Not Found'}")
         # Do we need to check for unique_id? since redis is optional storage
         # if we do not have unique_id available just use mongo for data instead
         if not refresh_token or not jwt_token:
             return redirect(url_for('login'))
-        # check if jwt is valid
-        server.logger.debug(f"{wrapper.__name__}: Checking if jwt is valid.")
-        jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
-        jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_key, server.logger)
-        server.logger.debug(f"{wrapper.__name__}: JWT Valid: {jwt_token_valid}")
         server.logger.debug(f"{wrapper.__name__}: Unique ID check: {unique_id}")
         if not unique_id:
             server.logger.debug(f"{wrapper.__name__}: Unique ID not found, setting.")
@@ -71,22 +64,26 @@ def validate_tokens(f):
             unique_id = str(uuid4())
             rc.set(unique_id, email)
         server.logger.debug(f"{wrapper.__name__}: Unique ID: {unique_id}")
+        # check if jwt is valid
+        server.logger.debug(f"{wrapper.__name__}: Checking if jwt is valid.")
+        jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+        jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_key, server.logger)
+        server.logger.debug(f"{wrapper.__name__}: JWT Valid: {jwt_token_valid}")
         if not jwt_token_valid:
             server.logger.debug(f"{wrapper.__name__}: JWT token not valid.")
             # if not valid, check if refresh token is valid
             refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
             refresh_token_valid = JWTHandler.validate_refresh_token(refresh_token, refresh_key, server.logger)
+            server.logger.debug(f"{wrapper.__name__}: Refresh token valid?: {refresh_token_valid}")
             if not refresh_token_valid:
-                server.logger.debug(f"{wrapper.__name__}: Refresh token not valid.")
                 return redirect(url_for('login'))
-            
             # if refresh token is valid, call refresh token endpoint
             server.logger.debug(f"{wrapper.__name__}: Calling refresh token endpoint.")
             server.logger.debug(f"{wrapper.__name__}: calling refresh token endpoint: {auth_service_url + refresh_endpoint}")
             cookies = {'refresh_token': refresh_token, 'unique_id': unique_id, 'jwt_token': jwt_token}
             server.logger.debug(f"{wrapper.__name__}: Using cookies: {cookies}")
             response = requests.post(auth_service_url + refresh_endpoint, cookies=cookies)
-            server.logger.debug(f"{wrapper.__name__}: Refresh token response: {response}")
+            server.logger.debug(f"{wrapper.__name__}: Response Statuc: {response.status_code}, Refresh token response: {response}")
             if response.status_code != 200:
                 return redirect(url_for('login'))
 

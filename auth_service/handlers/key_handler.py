@@ -25,16 +25,9 @@ class KeyHandler:
             Exception: If the provided key_name is not valid.
         """
         if key_name.name not in self.pvt_keys:
-            print("Invalid key_name:", key_name)
             raise Exception("Invalid key_name")
         if not self.pvt_keys[key_name.name]:
             crypto_handler = CryptoHandler()
             key, password = crypto_handler.get_private_key(key_name)
-            print("pub_dict:", self.pub_keys)
-            print("pvt_dict:", self.pvt_keys)
-            print("key:", key)
-            print("password:", password)
             self.pvt_keys[key_name.name] = {'key': key, 'password': password}
-        print("pub_dict:", self.pub_keys)
-        print("pvt_dict:", self.pvt_keys)
         return self.pvt_keys[key_name.name]['key'], self.pvt_keys[key_name.name]['password']

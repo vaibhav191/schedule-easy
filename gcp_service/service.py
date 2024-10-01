@@ -19,7 +19,7 @@ def get_email():
     try:
         encoded_jwt = request.headers['Authorization'].split(' ')[1]
         decoded_jwt_resp = requests.get("http://127.0.0.1:5000/decode-jwt",json = {"encoded_jwt":encoded_jwt})
-        print("DECODED_JWT_RESP", decoded_jwt_resp)
+        
         decoded_jwt = json.loads(decoded_jwt_resp.text)
         cred = decoded_jwt['cred']
     except KeyError as e:
@@ -27,23 +27,23 @@ def get_email():
     try:
         cred = Credentials.from_authorized_user_info(cred)
     except Exception as err:
-        print("Exception converting cred json to Credentials")
+        
         return err, 500
     # call gcp for email address
     try:
-        print('service and result')
+        
         service = build("people", "v1", credentials = cred)
         result = service.people().get(resourceName='people/me', personFields="emailAddresses").execute()
     except Exception as err:
-        print("exception making API call")
+        
         return err, 500
     # try to fetch the primary email from the results
     try:
-        print("RESULTS:",result)
+        
         for email_address in result['emailAddresses']:
             if email_address['metadata']['primary'] == True:
                 email = email_address['value']
-        print('Email: ', email)
+        
     except KeyError as e:
         return str(err), 500
 

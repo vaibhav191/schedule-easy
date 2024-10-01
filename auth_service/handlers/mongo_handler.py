@@ -37,9 +37,6 @@ class MongoDBHandler:
 
     @staticmethod
     def insert_one(collection: Collection, data: Dict[str, str]) -> InsertOneResult:
-        # post_json = json.dumps(data)
-        # print(type(post_json))
-        # print(post_json)
         post_id = collection.insert_one(data).inserted_id
         return post_id
     

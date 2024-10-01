@@ -155,8 +155,8 @@ def refresh():
     jwt_token = request.cookies.get('jwt_token')
     unique_id = request.cookies.get('unique_id')
     app.logger.debug(f"{refresh.__name__}: Unique ID: {unique_id if unique_id else 'Not Found'}")
-    app.logger.debug(f"{refresh.__name__}: Refresh Token: {refresh_token if refresh_token else 'Not Found'}")
-    app.logger.debug(f"{refresh.__name__}: JWT Token: {jwt_token if jwt_token else 'Not Found'}")
+    app.logger.debug(f"{refresh.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
+    app.logger.debug(f"{refresh.__name__}: JWT Token: {jwt_token[:10] if jwt_token else 'Not Found'}")
     data = rc.get(unique_id, app.logger) if unique_id else None
     app.logger.debug(f"{refresh.__name__}: Data: {data}")
     email = data.get('email') if data else None
@@ -198,7 +198,7 @@ def refresh():
     jwt_pvt_key, jwt_key_password = key_wallet.get_pvt_key(Keys.JWT_TOKEN)
     refresh_pvt_key, refresh_key_password = key_wallet.get_pvt_key(Keys.REFRESH_TOKEN)
     jwt_token, refresh_token = JWTHandler.create_tokens(email if email else user_record['email'], jwt_id, jwt_pvt_key, jwt_key_password, refresh_id, refresh_pvt_key, refresh_key_password)
-    app.logger.debug(f"{refresh.__name__}: JWT Token: {jwt_token}")
+    app.logger.debug(f"{refresh.__name__}: JWT Token: {jwt_token[:10]}")
     app.logger.debug(f"{refresh.__name__}: Refresh Token: {refresh_token}")
     # update jwt-id and refresh-id in mongo
     app.logger.debug(f"{refresh.__name__}: Updating user record in mongo")
@@ -227,7 +227,7 @@ def logout():
     jwt_token = request.cookies.get('jwt_token')
     app.logger.debug(f"{logout.__name__}: Unique ID: {unique_id}")
     app.logger.debug(f"{logout.__name__}: Refresh Token: {refresh_token}")
-    app.logger.debug(f"{logout.__name__}: JWT Token: {jwt_token}")
+    app.logger.debug(f"{logout.__name__}: JWT Token: {jwt_token[:10]}")
     
     if refresh_token or not jwt_token:
         app.logger.debug(f"{logout.__name__}: Invalid request")
@@ -251,7 +251,7 @@ def logout():
     refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
     
     jwt_id = jwt.decode(jwt_token, jwt_key, algorithms=['RS256'], verify=False).get('jti')
-    app.logger.debug(f"{logout.__name__}: JWT ID: {jwt_id}")
+    app.logger.debug(f"{logout.__name__}: JWT ID: {jwt_id[:10]}")
     refresh_id = jwt.decode(refresh_token, refresh_key,algorithms=['RS256'], verify=False).get('jti')
     app.logger.debug(f"{logout.__name__}: Refresh ID: {refresh_id}")
 

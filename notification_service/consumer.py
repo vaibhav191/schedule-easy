@@ -1,4 +1,5 @@
 from uuid import uuid4
+from flask import Response
 import pika
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -62,13 +63,10 @@ def consumer(ch, method, properties, body):
     client = MongoClient("mongodb://localhost:27017")
     event_req_coll = client['event_automation']
     if not client:
-        print("Mongo client not found")
         return Response("Mongo client not found", 500)
     fs = gridfs.GridFS(event_req_coll) 
     # get file from mongo
     obj = fs.get(fid)
-    print("FILE OBTAINED FROM MONGO")
-    print(type(obj), obj)
     # create temp file
     # df = pd.read_excel(obj)
     # df.to_excel('Results_'+str(uuid4)+'.xlsx')
@@ -102,7 +100,6 @@ def mailer(username, password, email_receiver, file_obj):
     server.sendmail(username, email_receiver, text)
     server.quit()
 
-    print("Sent!")
 
 if __name__ == '__main__':
     rabbitmq = RabbitMQ()

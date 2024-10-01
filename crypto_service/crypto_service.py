@@ -82,10 +82,8 @@ class Passwords:
             Keys.REFRESH_TOKEN.name: None
         }
     def get_password(self, key: Keys) -> str:
-        print("password obj: ",self.passwords)
         if self.passwords[key.name] is None:
             self.passwords[key.name] = FileHandler.read_from_json(os.path.join(CryptoUtils.secrets_folder, CryptoUtils.secrets_file), key.name)
-            print("password obj: ",self.passwords)
             self.passwords[key.name] = self.passwords[key.name].encode('utf-8')
         
         return self.passwords[key.name]
@@ -121,34 +119,34 @@ class CryptoUtils:
     @staticmethod
     def get_key(key_name: Keys, pub: bool = False, pvt:bool = False) -> bytes:
         if not os.path.exists(CryptoUtils.secrets_folder):
-            print("Creating secrets folder")
+            
             CryptoUtils.create_secret_dir()
         if CryptoUtils.key_map[key_name.name] == KeyTypes.ASYMMETRIC:
             extension = '.pub' if pub else '.pem' if pvt else ''
             if not os.path.exists(os.path.join(CryptoUtils.secrets_folder, key_name.name + extension)):
-                print("Generating key:", key_name.name)
+                
                 CryptoUtils.keygen(key_name=key_name, key_type=CryptoUtils.key_map[key_name.name])
-            print("Reading key:", key_name.name)
+            
             key = FileHandler.read_from_file(os.path.join(CryptoUtils.secrets_folder, key_name.name + extension))
-            print("key from path: ", os.path.join(CryptoUtils.secrets_folder, key_name.name + extension))
+            
             if type(key) is str:
                 key = key.encode('utf-8')
-            print("returning asymmetric key: ", key_name.name)
+            
             return key
         # else its a symmetric key used for redis
-        print("Generating symmetric key:", key_name.name)
+        
         key = CryptoUtils.keygen(key_name=key_name, key_type=CryptoUtils.key_map[key_name.name])        
-        print("returning symmetric key: ", key_name.name)
+        
         return key
     
     @staticmethod
     def keygen(key_name:Keys, key_type: KeyTypes) -> Union[None, bytes]:
         if not os.path.exists(CryptoUtils.secrets_folder):
-            print("Creating secrets folder")
+            
             CryptoUtils.create_secret_dir()
         if key_type == KeyTypes.ASYMMETRIC:
-            print("Generating Asymmetric key")
-            print("key_name: ", key_name)
+            
+            
             key_password = FileHandler.read_from_json(os.path.join(CryptoUtils.secrets_folder, CryptoUtils.secrets_file), key_name.name)
             key_password = key_password.encode('utf-8')
             # generating private key
@@ -156,28 +154,28 @@ class CryptoUtils:
                 public_exponent=65537,
                 key_size=2048,
                 )
-            print("key_password: ", key_password)
+            
             pem = private_key.private_bytes(
                 encoding = Encoding.PEM,
                 format=PrivateFormat.PKCS8,
                 encryption_algorithm=BestAvailableEncryption(key_password)
                 )
-            print("writing private key: ", key_name.name)
+            
             FileHandler.write(path = os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pem'), data=pem)
-            print("key written to file:", os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pem'))
+            
             # generating public key
             public_key = private_key.public_key()
             pub = public_key.public_bytes(
                 encoding = Encoding.PEM,
                 format=PublicFormat.SubjectPublicKeyInfo
                 )
-            print("writing public key: ", key_name.name)
+            
             FileHandler.write(path = os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pub'), data=pub)
-            print("key written to file:", os.path.join(CryptoUtils.secrets_folder, key_name.name + '.pub'))
+            
         # we do not save symmetric keys, since its only used for redis cache encryption
         elif key_type == KeyTypes.SYMMETRIC:
             key = Fernet.generate_key()
-            print("returning symmetric key: ", key_name.name)
+            
             return key
 
     # fix required: it should only accept bytes
@@ -212,12 +210,12 @@ class CryptoUtils:
         password = password_obj.get_password(Keys[key_name])
         if type(password) is str:
             password = password.encode('utf-8')
-        print(password)
-        print(type(password))
-        print(pvt_key)
-        print(type(pvt_key))
-        print(ciphertext)
-        print(type(ciphertext))
+        
+        
+        
+        
+        
+        
         pvt_key = serialization.load_pem_private_key(pvt_key, password= password)
         
         plaintext = pvt_key.decrypt(
@@ -322,33 +320,33 @@ def decrypt():
             - A JSON object with the decrypted plaintext in base64 encoding.
     '''
     if not request.is_json:
-        print("Bad Request: Require JSON format", request.get_json())
+        
         return "Bad Request: Require JSON format", 400
     data = request.get_json()
     if 'key_name' not in data:
-        print("Bad Request: key_name required in key_details", request.get_json())
+        
         return "Bad Request: key_name required in key_details", 400
     
     key_name: str = data.get('key_name')
 
     if key_name not in {'OAUTH_CREDENTIALS', 'JWT_TOKEN', 'REFRESH_TOKEN'}:
-        print("Bad Request: Invalid key_name", request.get_json())
+        
         return "Bad Request: Invalid key_name", 400
     
     if 'ciphertext' not in data:
-        print("Bad Request: ciphertext required", request.get_json())
+        
         return "Bad Request: ciphertext required", 400
     
     ciphertext_base64_encoded = data['ciphertext']
     if ciphertext_base64_encoded is None:
-        print("Bad Request: ciphertext required", request.get_json())
+        
         return "Bad Request: ciphertext required", 400
 
     ciphertext: bytes = base64.b64decode(ciphertext_base64_encoded)
-    print(ciphertext)
+    
     plaintext: bytes = CryptoUtils.decrypt(ciphertext, key_name)
-    print(plaintext)
-    print(type(plaintext))
+    
+    
     plaintext_base64 = base64.b64encode(plaintext).decode('utf-8')
     return jsonify({"plaintext": plaintext_base64}), 200
 

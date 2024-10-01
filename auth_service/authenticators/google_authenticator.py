@@ -25,6 +25,7 @@ from flask import redirect, request, url_for
 from google.oauth2.credentials import Credentials
 import google_auth_oauthlib.flow
 from handlers.kms_handler import KMSHandler
+from logging import Logger
 
 class CredsGenerator:
     def __init__(self, scopes: List) -> None:
@@ -56,7 +57,7 @@ class CredsGenerator:
         # Enable incremental authorization. Recommended as a best practice.
         include_granted_scopes='true')
 
-        print("authorization_URL:", self.authorization_url)
+        Logger.debug(f"{CredsGenerator.__name__}, {CredsGenerator.authorize.__name__} authorization_URL: {self.authorization_url}")
         return redirect(self.authorization_url)
     
     def callback(self, state, unique_id) -> Credentials:

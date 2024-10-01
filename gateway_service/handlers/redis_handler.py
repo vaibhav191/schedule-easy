@@ -16,14 +16,14 @@ class RedisHandler:
 
     def set(self, key: str, data: Union[str, Dict]) -> bool:
         data = json.dumps(data)
-        print("Redis set Data:", data)
+        
         return self.redis_client.set(key, data)
     
     def get(self, key: Union[str, Dict]) -> Union[str, Dict[str, str]]:
-        print("Redis get key:", key)
+        
         data = self.redis_client.get(key)
         data = json.loads(data)
-        print("Redis Data received:", data)
+        
         return data
     
     def delete(self, key) -> None:

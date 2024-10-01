@@ -68,19 +68,14 @@ class JWTHandler:
         try:
             data = jwt.decode(jwt_token, jwt_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
             if data['tkn'] != "auth token":
-                print("Invalid token type, expected auth token, received:", data['tkn'])
                 return False
         except jwt.ExpiredSignatureError:
-            print("Expired Signature")
             return False
         except jwt.InvalidAudienceError:
-            print("Invalid Audience")
             return False
         except jwt.InvalidIssuerError:
-            print("Invalid Issuer")
             return False
         except jwt.InvalidIssuedAtError:
-            print("Invalid Issued At")
             return False
         return True
 
@@ -89,18 +84,13 @@ class JWTHandler:
         try:
             data = jwt.decode(refresh_token, refresh_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
             if data['tkn'] != "refresh token":
-                print("Invalid token, expected refresh token, received:", data['tkn'])
                 return False
         except jwt.ExpiredSignatureError:
-            print("Error with Refresh token")
             return False
         except jwt.InvalidIssuerError:
-            print("Invalid Issuer")
             return False
         except jwt.InvalidIssuedAtError:
-            print("Invalid Issued At")
             return False
         except jwt.InvalidAudienceError:
-            print("Invalid Audience")
             return False
         return True

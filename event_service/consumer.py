@@ -59,7 +59,7 @@ def event_consumer(ch, method, properties, body):
     client = MongoClient("mongodb://localhost:27017")
     event_req_coll = client['event_automation']
     if not client:
-        print("Mongo client not found")
+        
         return Response("Mongo client not found", 500)
     fs = gridfs.GridFS(event_req_coll) 
     # get file content from mongo
@@ -71,12 +71,12 @@ def event_consumer(ch, method, properties, body):
     df_result.drop(columns = [df.columns[0]], inplace = True)
     file_name = "Event_results_" + str(uuid4()) + '.xlsx'
     df_result.to_excel(file_name)
-    print('file created')
+    
     # upload result in mongodb
     client = MongoClient("mongodb://localhost:27017")
     event_req_coll = client['event_automation']
     if not client:
-        print("Mongo client not found")
+        
         return Response("Mongo client not found", 500)
     fs = gridfs.GridFS(event_req_coll) 
     # delete temp file created
@@ -86,13 +86,13 @@ def event_consumer(ch, method, properties, body):
     fid_write = fs.put(file_content)
     if os.path.exists(file_path):
         os.remove(file_path)
-        print('file deleted')
+        
     # delete file from mongo
     fs.delete(fid_read)
-    print('file deleted from mongo:',str(fid_read))
+    
     # publish fileid in notificationQ
     publish_notification(email, str(fid_write))
-    print('event published in Notification Q:', fid_write)
+    
 
 def publish_notification(email, fid):
     rabbitmq = RabbitMQ()
@@ -115,12 +115,12 @@ def create_events(cred, df):
         event['start'] = {'dateTime':str(row["StartDate"])[:10] + "T"+str(row["StartTime"]), "timeZone" : row["TimeZone"]}
         event["end"] = {"dateTime" : str(row["EndDate"])[:10] + "T" + str(row["EndTime"]), "timeZone" : row["TimeZone"]}
         event['reminders'] = {'useDefault':False, 'overrides' : [{"method":'popup', 'minutes':15}]}
-        print("-----------REQUESTING EVENT DETAILS---------------")
-        print(event)
+        
+        
         event = service.events().insert(calendarId='primary', body=event).execute()
         df.iloc[i, eventid_index] = event['id']
         df.iloc[i, status_index] = event['status']
-        print("--------EVENT CREATED------------")
+        
     return df
 
 if __name__ == '__main__':
