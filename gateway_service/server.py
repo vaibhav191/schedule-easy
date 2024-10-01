@@ -54,9 +54,7 @@ def validate_tokens(f):
         # if we do not have unique_id available just use mongo for data instead
         server.logger.debug("Request: %s", request.host)
         if not refresh_token or not jwt_token:
-            if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
-                return redirect(f"{auth_service_url}{login_endpoint}")
-            return redirect(auth_service_url + login_endpoint)
+            return redirect(url_for('login'))
         # check if jwt is valid
         server.logger.debug("Checking if jwt is valid.")
         jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
@@ -76,18 +74,14 @@ def validate_tokens(f):
             refresh_token_valid = JWTHandler.validate_jwt_token(refresh_token, refresh_key)
             if not refresh_token_valid:
                 server.logger.debug("Refresh token not valid.")
-                if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
-                    return redirect(f"{auth_service_url}{login_endpoint}")
-                return redirect(auth_service_url + login_endpoint)
+                return redirect(url_for('login'))
             
             # if refresh token is valid, call refresh token endpoint
             server.logger.debug("Calling refresh token endpoint.")
             response = requests.post(auth_service_url + refresh_endpoint)
             server.logger.debug("Refresh token response: %s", response)
             if response.status_code != 200:
-                if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
-                    return redirect(f"{auth_service_url}{login_endpoint}")
-                return redirect(auth_service_url + login_endpoint)
+                return redirect(url_for('login'))
 
             new_jwt_token = response.cookies.get('jwt_token')
             new_refresh_token = response.cookies.get('refresh_token')
