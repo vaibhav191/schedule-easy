@@ -7,7 +7,7 @@
 [ ] - Pending Services Corrections:
     [X] - gateway_service
         [X] - implement upload once msg_service is done 
-    [ ] - event_service
+    [X] - event_service
     [X] - msg_service
     [ ] - notification_service
 [X] - Hash the messages before pushing them to the Q
