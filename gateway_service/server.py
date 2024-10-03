@@ -169,7 +169,14 @@ def upload():
         }
         server.logger.debug(f"{upload.__name__} Message: {message}")
         # send obj to msg_service publisher to eventQ
-        response = requests.post(msg_service_url + publish_event_endpoint, json = {'message': message, 'queue_name': 'eventQ'})
+        # get rest of cookies to pass
+        jwt_token = request.cookies.get('jwt_token')
+        refresh_token = request.cookies.get('refresh_token')
+        cookies = {'jwt_token': jwt_token, 'refresh_token': refresh_token, 'unique_id': unique_id}
+
+        response = requests.post(msg_service_url + publish_event_endpoint,
+                                  json = {'message': message, 'queue_name': 'eventQ'},
+                                  cookies=cookies)
         if response.status_code != 200:
             server.logger.debug(f"{upload.__name__} Error posting to EventQ:{response}")
             return Response(f"Error posting to EventQ:{response}", status = 500)
