@@ -1,6 +1,7 @@
 import base64
 import logging
 import sys
+from typing import Dict
 from flask import Flask, Response, request
 import json
 from handlers.kms_handler import KMSHandler
@@ -72,37 +73,49 @@ def publish_message():
         event publisher needs to be generic. It should be able to publish to any queue.
         It should take in the queue name and message to be published.
     '''
-    # first get the cookies from the request, get the jwt token and refresh token
-        # if valid, push to eventQ, along with the hash of the message using the key described below
-    # set up a symmetric key in the crypto service - use a PRF for hashing
-        # this symmetric key can be called by publisher to then use the key along with a random number as input to generate an output.
-        # this output can be used to generate a hash of the message     if not request:
-        # send this random number along with the message to the eventQ
-        # consumer can then use the random number along with the key from crypto service to generate the random number to verify the hash
-    # Simple hashing for now, using a symmetric key from crypto service
-    
-    # validate the tokens
-    if not request:
-        return Response("No request found", status = 500)
-    if not request.get_json():
-        return Response("No JSON found in request", status = 500)
-    if not request.get_json().get('message'):
-        return Response("No message found in request", status = 500)
-    if not request.get_json().get('queue_name'):
-        return Response("No queue_name found in request", status = 500)
+    try:
+        # first get the cookies from the request, get the jwt token and refresh token
+            # if valid, push to eventQ, along with the hash of the message using the key described below
+        # set up a symmetric key in the crypto service - use a PRF for hashing
+            # this symmetric key can be called by publisher to then use the key along with a random number as input to generate an output.
+            # this output can be used to generate a hash of the message     if not request:
+            # send this random number along with the message to the eventQ
+            # consumer can then use the random number along with the key from crypto service to generate the random number to verify the hash
+        # Simple hashing for now, using a symmetric key from crypto service
+        
+        # validate the tokens
+        if not request:
+            return Response("No request found", status = 500)
+        if not request.get_json():
+            return Response("No JSON found in request", status = 500)
+        if not request.get_json().get('message'):
+            return Response("No message found in request", status = 500)
+        if not request.get_json().get('queue_name'):
+            return Response("No queue_name found in request", status = 500)
 
-    payload = request.get_json()
-    message = payload['message']
-    queue_name = payload['queue_name']
-    # generate the hash of the message
-    message_b64 = base64.b64encode(message.encode('utf-8')).decode('utf-8')
-    message_hash = kms.generate_hmac(message_b64, kms.eventQ_mac_keyId)
-    message = {'message': message, 'hash': message_hash}
-    # Todo: call crypto service to fetch the symmetric key for hashing, use PRF - pseudo random function
-    rabbitmq = RabbitMQ()
-    rabbitmq.publish(queue_name = queue_name, message = json.dumps(message))
-    rabbitmq.close()
-    return Response("Message published successfully", status = 200)
+        server.logger.debug(f"{publish_message.__name__}: Request json: {request.get_json()}")
+        payload = request.get_json()
+        message_b64 = payload['message']
+        server.logger.debug(f"{publish_message.__name__}: Message type: {type(message_b64) if message_b64 else 'Not Found'}")
+        server.logger.debug(f"{publish_message.__name__}: Message: {message_b64 if message_b64 else 'Not Found'}")
+        queue_name: str = payload['queue_name']
+        server.logger.debug(f"{publish_message.__name__}: Queue Name type: {type(queue_name) if queue_name else 'Not Found'}")
+        server.logger.debug(f"{publish_message.__name__}: Queue Name: {queue_name if queue_name else 'Not Found'}")
+        # generate the hash of the message
+        message_hash_bytes = kms.generate_hmac(message_b64, kms.eventQ_mac_keyId)
+        message_hash_b64 = base64.b64encode(message_hash_bytes).decode('utf-8')
+        message = {'message': message_b64, 'hash': message_hash_b64}
+        server.logger.debug(f"{publish_message.__name__}: Message: {message}")
+        # Todo: call crypto service to fetch the symmetric key for hashing, use PRF - pseudo random function
+        rabbitmq = RabbitMQ()
+        rabbitmq.publish(queue_name = queue_name, message = json.dumps(message))
+        rabbitmq.close()
+        server.logger.debug(f"{publish_message.__name__}: Message published successfully")
+
+        return Response("Message published successfully", status = 200)
+    
+    except Exception as e:
+        return Response(f"Error: {str(e)}", status = 500)
 
 if __name__ == '__main__':
     server.run(host = "0.0.0.0", port = 9989)

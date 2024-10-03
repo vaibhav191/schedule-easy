@@ -1,6 +1,7 @@
 """
     - Get msg_service up and running and then work on upload endpoint
 """
+import base64
 from uuid import uuid4
 from flask import Flask, make_response, request, Response, redirect, session, render_template, send_file
 import jwt
@@ -168,6 +169,9 @@ def upload():
             'email': email
         }
         server.logger.debug(f"{upload.__name__} Message: {message}")
+        message_json = json.dumps(message)
+        message_bytes = message_json.encode('utf-8')
+        message_b64 = base64.b64encode(message_bytes).decode('utf-8')
         # send obj to msg_service publisher to eventQ
         # get rest of cookies to pass
         jwt_token = request.cookies.get('jwt_token')
@@ -175,7 +179,7 @@ def upload():
         cookies = {'jwt_token': jwt_token, 'refresh_token': refresh_token, 'unique_id': unique_id}
 
         response = requests.post(msg_service_url + publish_event_endpoint,
-                                  json = {'message': message, 'queue_name': 'eventQ'},
+                                  json = {'message': message_b64, 'queue_name': 'eventQ'},
                                   cookies=cookies)
         if response.status_code != 200:
             server.logger.debug(f"{upload.__name__} Error posting to EventQ:{response}")
