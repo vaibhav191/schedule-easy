@@ -193,8 +193,8 @@ def refresh():
     jwt_pvt_key, jwt_key_password = key_wallet.get_pvt_key(Keys.JWT_TOKEN)
     refresh_pvt_key, refresh_key_password = key_wallet.get_pvt_key(Keys.REFRESH_TOKEN)
     jwt_token, refresh_token = JWTHandler.create_tokens(email if email else user_record['email'], jwt_id_new, jwt_pvt_key, jwt_key_password, refresh_id_new, refresh_pvt_key, refresh_key_password)
-    app.logger.debug(f"{refresh.__name__}: JWT Token: {jwt_token[:10]}")
-    app.logger.debug(f"{refresh.__name__}: Refresh Token: {refresh_token[:10]}")
+    app.logger.debug(f"{refresh.__name__}: JWT Token: {jwt_token[:10] if jwt_token else 'Not Found'}")
+    app.logger.debug(f"{refresh.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
     # update jwt-id and refresh-id in mongo
     app.logger.debug(f"{refresh.__name__}: Updating user record in mongo")
     user_record['jwt-id'] = jwt_id_new
@@ -221,8 +221,8 @@ def logout():
     refresh_token = request.cookies.get('refresh_token')
     jwt_token = request.cookies.get('jwt_token')
     app.logger.debug(f"{logout.__name__}: Unique ID: {unique_id}")
-    app.logger.debug(f"{logout.__name__}: Refresh Token: {refresh_token[:10]}")
-    app.logger.debug(f"{logout.__name__}: JWT Token: {jwt_token[:10]}")
+    app.logger.debug(f"{logout.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
+    app.logger.debug(f"{logout.__name__}: JWT Token: {jwt_token[:10] if jwt_token else 'Not Found'}")
     
     if refresh_token or not jwt_token:
         app.logger.debug(f"{logout.__name__}: Invalid request")

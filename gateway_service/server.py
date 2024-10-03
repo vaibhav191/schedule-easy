@@ -108,9 +108,9 @@ def home():
     refresh_token = request.cookies.get('refresh_token')
     unique_id = request.cookies.get('unique_id')
     server.logger.debug(f"{home.__name__}: Home route.")
-    server.logger.debug(f"{home.__name__}: JWT Token: {jwt_token}")
-    server.logger.debug(f"{home.__name__}: Refresh Token: {refresh_token[:10]}")
-    server.logger.debug(f"{home.__name__}: Unique ID: {unique_id}")
+    server.logger.debug(f"{home.__name__}: JWT Token: {jwt_token if jwt_token else 'Not Found'}")
+    server.logger.debug(f"{home.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
+    server.logger.debug(f"{home.__name__}: Unique ID: {unique_id if unique_id else 'Not Found'}")
     # when we come to home, show them the home screen
     # send them to main screen if they have valid jwt token, refresh token and unique_id
     if jwt_token and refresh_token and unique_id:
@@ -124,7 +124,7 @@ def main():
     server.logger.debug(f"{main.__name__}: Main route.")
     unique_id = request.cookies.get('unique_id')
     redis_data = rc.get(unique_id)
-    server.logger.debug(f"{main.__name__}: Redis data: {redis_data}")
+    server.logger.debug(f"{main.__name__}: Redis data: {redis_data if redis_data else 'Not Found'}")
     return render_template('main.html', email = redis_data['email'])
 
 @server.route("/download", methods=["GET"])
@@ -188,9 +188,9 @@ def login():
     jwt_token = request.cookies.get('jwt_token')
     refresh_token = request.cookies.get('refresh_token')
     unique_id = request.cookies.get('unique_id')
-    server.logger.debug(f"{login.__name__}: JWT Token: {jwt_token[:10]}")
-    server.logger.debug(f"{login.__name__}: Refresh Token: {refresh_token[:10]}")
-    server.logger.debug(f"{login.__name__}: Unique ID: {unique_id}")
+    server.logger.debug(f"{login.__name__}: JWT Token: {jwt_token[:10] if jwt_token else 'Not Found'}")
+    server.logger.debug(f"{login.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
+    server.logger.debug(f"{login.__name__}: Unique ID: {unique_id if unique_id else 'Not Found'}")
     jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
     refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
     if jwt_token and refresh_token:
