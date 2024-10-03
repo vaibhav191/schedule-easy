@@ -123,7 +123,7 @@ def home():
 def main():
     server.logger.debug(f"{main.__name__}: Main route.")
     unique_id = request.cookies.get('unique_id')
-    redis_data = rc.get(unique_id)
+    redis_data = rc.get(unique_id, server.logger)
     server.logger.debug(f"{main.__name__}: Redis data: {redis_data if redis_data else 'Not Found'}")
     return render_template('main.html', email = redis_data['email'])
 
@@ -158,7 +158,7 @@ def upload():
                 jwt_token = request.cookies.get('jwt_token')
                 email = jwt.decode(jwt_token, key_wallet.get_pub_key(Keys.JWT_TOKEN), algorithms=['RS256'], verify=False)['sub']
             else:
-                email = rc.get(unique_id)['email']
+                email = rc.get(unique_id, server.logger)['email']
             message = {
                 'fid': str(fid),
                 'email': email
