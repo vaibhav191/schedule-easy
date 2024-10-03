@@ -22,8 +22,8 @@ eventQ consumer will call event_service and returns 200 and removes from eventQ
 notificationQ consumer will call notification_service
 '''
 
-import dotenv
-dotenv.load_dotenv('../.env')
+# import dotenv
+# dotenv.load_dotenv('../.env')
 kms = KMSHandler()
 key_wallet = KeyHandler()
 server = Flask(__name__)
@@ -105,4 +105,4 @@ def publish_message():
     return Response("Message published successfully", status = 200)
 
 if __name__ == '__main__':
-    server.run(host = "127.0.0.1", port = 9989)
+    server.run(host = "0.0.0.0", port = 9989)

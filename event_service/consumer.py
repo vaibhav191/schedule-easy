@@ -1,3 +1,4 @@
+import base64
 from flask import Response
 import pika
 import pandas as pd
@@ -50,11 +51,16 @@ def event_consumer(ch, method, properties, body):
     if type(body) == bytes:
         body = body.decode('utf-8')
     body = json.loads(body)
-    fid_read = ObjectId(body['fid'])
-    jwt_encoded = body['jwt']
-    email = body['email']
-    decoded_jwt_response = requests.get("http://127.0.0.1:5000/decode-jwt", json = {'encoded_jwt': jwt_encoded})
-    decoded_jwt = json.loads(decoded_jwt_response.text)
+    message_b64 = body['message']
+    hash = body['hash']
+    # validate the hash of the message_b64
+
+    # if valid, decode the b64 message
+    message = base64.b64decode(message_b64).decode('utf-8') # gives string
+    fid = message['fid']
+    email = message['email']
+    fid_read = ObjectId(fid)
+    # fetch cred for this email id from mongo
     cred = decoded_jwt['cred']
     # init mongo client
     client = MongoClient("mongodb://localhost:27017")
@@ -90,7 +96,11 @@ def event_consumer(ch, method, properties, body):
         
     # delete file from mongo
     fs.delete(fid_read)
-    
+
+    # send a post request to msg_service to put this message in notificationQ
+    # if response is 200, end
+    # else try 3 times 
+
     # publish fileid in notificationQ
     publish_notification(email, str(fid_write))
     

@@ -81,9 +81,34 @@ services:
       REDIS_HOST: redis
       CRYPTO_PORT: 7070
       CRYPTO_HOST: crypto_service
+      MSG_PORT: ${MSG_PORT}
+      MSG_HOST: msg_service
+
     depends_on:
       - redis
       - mongo
+
+  msg_service:
+    image: msg_service
+    build:
+      context: ./msg_service
+      dockerfile: Dockerfile
+    ports:
+      - '${MSG_PORT}:9989'
+    environment:
+      MSG_PORT: ${MSG_PORT}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_AMQP_PORT: ${RABBITMQ_AMQP_PORT}
+      RABBITMQ_MGMT_PORT: ${RABBITMQ_MGMT_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      AUTH_KMS_ACCOUNT_ID: ${AUTH_KMS_ACCOUNT_ID}
+      AUTH_KMS_ACCESS_KEY: ${AUTH_KMS_ACCESS_KEY}
+      AUTH_KMS_SECRET_KEY: ${AUTH_KMS_SECRET_KEY}
+      AUTH_KMS_REGION: ${AUTH_KMS_REGION}
+      MSG_APP_CREDENTIALS_KEYID: ${MSG_APP_CREDENTIALS_KEYID}
+    depends_on:
+      - rabbitmq
 
 volumes:
   redis-data:

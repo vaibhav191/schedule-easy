@@ -1,9 +1,9 @@
 import os
-import pika
+import pika # type: ignore
 
 class RabbitMQ:
     def __init__(self):
-        self.user = os.getenv('RABBITMQ_USER')
+        self.user = os.getenv('RABBITMQ_USERNAME')
         self.password = os.getenv('RABBITMQ_PASSWORD')
         self.host = os.getenv('RABBITMQ_HOST')
         self.port = os.getenv('RABBITMQ_AMQP_PORT')

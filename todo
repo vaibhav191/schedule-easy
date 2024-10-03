@@ -4,9 +4,20 @@
 [X] - Change EC to RSA encryption, store secrets in a different folder /secrets
 [X] - Implement encrypt and decrypt for the encryption to work on jwt and credentials
 [X] - implement jwt
-[ ] - Pending Services:
+[ ] - Pending Services Corrections:
     [ ] - gateway_service
             - Implement upload once msg_service is done 
     [ ] - event_service
     [ ] - msg_service
     [ ] - notification_service
+[ ] - Hash the messages before pushing them to the Q
+
+Future Enhancements:
+[ ] - Change simple hashing for messages to hashing using Pseudo Random Functions
+[ ] - Encrypt user's email before storing in MongoDB
+[ ] - ECC encryption instead of RSA
+[ ] - AWS Lambda?
+[ ] - AWS MessageQ?
+[ ] - CI/CD?
+[ ] - Kafka? 
+[ ] - Keys request to AWS should happen through crypto_service, and services get keys from crypto_service

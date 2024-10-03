@@ -35,15 +35,14 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s 
 auth_service_address = 'auth_service' 
 auth_service_port = os.getenv('AUTH_PORT', '5000')
 auth_service_url = f"http://{auth_service_address}:{auth_service_port}"
-logging.debug(f"Auth service URL: {auth_service_url}")
 login_endpoint = "/login"
 refresh_endpoint = "/refresh-token"
 logout_endpoint = "/logout"
 
-msg_service_address = os.getenv('MSG_SERVICE_ADDRESS', 'msg_service')
-msg_service_port = os.getenv('MSG_SERVICE_PORT', '9989')
+msg_service_address = os.getenv('MSG_HOST', 'msg_service')
+msg_service_port = os.getenv('MSG_SERVICE_PORT')
 msg_service_url = f"http://{msg_service_address}:{msg_service_port}"
-publish_event_endpoint = "/publish_event"
+publish_event_endpoint = '/publish_message'
 
 def validate_tokens(f):
     def wrapper(*args, **kwargs):
@@ -65,7 +64,8 @@ def validate_tokens(f):
             server.logger.debug(f"{wrapper.__name__}: Unique ID not found, setting.")
             email = jwt.decode(jwt_token, jwt_key, algorithms=['RS256'], verify=False)['sub']
             unique_id = str(uuid4())
-            rc.set(unique_id, email)
+            data = {'email': email}
+            rc.set(unique_id, data)
         server.logger.debug(f"{wrapper.__name__}: Unique ID: {unique_id}")
         # check if jwt is valid
         server.logger.debug(f"{wrapper.__name__}: Checking if jwt is valid.")
@@ -153,11 +153,23 @@ def upload():
             fs = gridfs.GridFS(db) 
             # call mongo service for upload
             fid = fs.put(uploaded_file)
+            unique_id = request.cookies.get('unique_id')
+            if not unique_id:
+                jwt_token = request.cookies.get('jwt_token')
+                email = jwt.decode(jwt_token, key_wallet.get_pub_key(Keys.JWT_TOKEN), algorithms=['RS256'], verify=False)['sub']
+            else:
+                email = rc.get(unique_id)['email']
+            message = {
+                'fid': str(fid),
+                'email': email
+            }
             # send obj to msg_service publisher to eventQ
-            response = requests.post(msg_service_url + publish_event_endpoint, json = {'fid': str(fid), 'jwt':session['Authorization'].split(' ')[1], 'email': session['email']})
+            response = requests.post(msg_service_url + publish_event_endpoint, json = {'message': message, 'queue_name': 'eventQ'})
             if response.status_code != 200:
                 server.logger.debug(f"{upload.__name__} Error posting to EventQ:{response}")
                 return Response(f"Error posting to EventQ:{response}", status = 500)
+            else :
+                server.logger.debug(f"{upload.__name__} Success posting to EventQ. {response.status_code}, {response.content}")
         return Response("Success", status=200)
     except Exception as e:
         server.logger.debug(f"{upload.__name__} Error: {str(e)}")
