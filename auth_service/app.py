@@ -197,7 +197,7 @@ def callback(unique_id):
     app.logger.debug(f"{callback.__name__}: User record: {user_record}")
     app.logger.debug(f"{callback.__name__}: Post ID: {post_id}")
     app.logger.debug(f"{callback.__name__}: Unique ID: {unique_id}")
-    response = make_response(redirect("http://127.0.0.1:8080"+request_url))
+    response = make_response(redirect(f"http://127.0.0.1:8080{request_url if request_url is not None else '/'}"))
     response.set_cookie('unique_id',unique_id, httponly=True)
     response.set_cookie('jwt_token', jwt_token, httponly=True)
     response.set_cookie('refresh_token', refresh_token, httponly=True)
