@@ -24,6 +24,7 @@ from models.keys import Keys
 from models.key_types import KeyTypes
 import sys
 import logging
+from models.scopes import Scopes
 
 rc = RedisHandler()
 key_wallet = KeyHandler()
@@ -39,6 +40,7 @@ auth_service_url = f"http://{auth_service_address}:{auth_service_port}"
 login_endpoint = "/login"
 refresh_endpoint = "/refresh-token"
 logout_endpoint = "/logout"
+upgrade_scope_endpoint = "/upgrade-scope"
 
 msg_service_address = os.getenv('MSG_HOST', 'msg_service')
 msg_service_port = os.getenv('MSG_PORT')
@@ -141,7 +143,31 @@ def upload():
     uploaded_file = request.files.get("file")
     server.logger.debug(f"{upload.__name__}: File: {uploaded_file if uploaded_file else 'Not Found'}")
     if uploaded_file:
-        #uploaded_file.save(os.path.join(os.getcwd(), uploaded_file.filename))
+        # get email from redis
+        if not unique_id:
+            jwt_token = request.cookies.get('jwt_token')
+            email = jwt.decode(jwt_token, key_wallet.get_pub_key(Keys.JWT_TOKEN), algorithms=['RS256'], verify=False)['sub']
+        else:
+            email = rc.get(unique_id, server.logger)['email']
+        server.logger.debug(f"{upload.__name__}: Email: {email}")
+        # check if user scope is valid
+        db = mongo_handler.get_client('auth')
+        collection = mongo_handler.get_collection(db, 'user_data')
+        query = {'email': email}
+        data = mongo_handler.fetch_one(collection, query)
+        server.logger.debug(f"{upload.__name__}: Data user_record: {data}")
+        if not data:
+            return Response("User not found", status=404)
+        scopes = data['scope']
+        if Scopes.FULL_CALENDAR.value not in scopes:
+            server.logger.debug(f"{upload.__name__}: Calendar Scope not found.")
+            # request additional scope
+            server.logger.debug(f"{upload.__name__}: Requesting additional scope.")
+            if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
+                scopes_requested = scopes + [Scopes.FULL_CALENDAR.value]
+                return redirect(f"http://127.0.0.1:5000{upgrade_scope_endpoint}?next=/main", json = {'scopes': scopes_requested})
+            return redirect(auth_service_url + upgrade_scope_endpoint + "?next=/main", json = {'scopes': scopes})
+        # uploaded_file.save(os.path.join(os.getcwd(), uploaded_file.filename))
         if not uploaded_file.filename.lower().endswith(('.xlsx', '.xls')):
             return Response("Invalid file type. Only .xlsx and .xls files are allowed.", status=400)
         # take file from request
@@ -159,11 +185,7 @@ def upload():
         fid = fs.put(uploaded_file)
         server.logger.debug(f"{upload.__name__} File ID: {fid if fid is not None else 'Not Found'}")
         unique_id = request.cookies.get('unique_id')
-        if not unique_id:
-            jwt_token = request.cookies.get('jwt_token')
-            email = jwt.decode(jwt_token, key_wallet.get_pub_key(Keys.JWT_TOKEN), algorithms=['RS256'], verify=False)['sub']
-        else:
-            email = rc.get(unique_id, server.logger)['email']
+        # generate message for eventQ
         message = {
             'fid': str(fid),
             'email': email

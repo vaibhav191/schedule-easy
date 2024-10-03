@@ -12,6 +12,8 @@ import json
 import os
 from flask import Flask, redirect, request, Response, url_for, make_response
 import uuid
+
+import requests
 from models.scopes import Scopes
 from handlers.redis_handler import RedisHandler
 from handlers.key_handler import KeyHandler
@@ -35,6 +37,65 @@ crypto_handler = CryptoHandler()
 mongo_handler = MongoDBHandler()
 rc = RedisHandler()
 
+
+def validate_tokens(f):
+    def wrapper(*args, **kwargs):
+        app.logger.debug(f"{validate_tokens.__name__}: Validating tokens.")
+        # check if session has jwt, refresh token, unique id
+        app.logger.debug(f"{wrapper.__name__}: Request: {request.host}")
+        refresh_token = request.cookies.get('refresh_token')
+        app.logger.debug(f"{wrapper.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
+        jwt_token = request.cookies.get('jwt_token')
+        app.logger.debug(f"{wrapper.__name__}: JWT Token: {jwt_token[:10] if jwt_token else 'Not Found'}")
+        unique_id = request.cookies.get('unique_id')
+        app.logger.debug(f"{wrapper.__name__}: Unique ID: {unique_id if unique_id else 'Not Found'}")
+        # Do we need to check for unique_id? since redis is optional storage
+        # if we do not have unique_id available just use mongo for data instead
+        if not refresh_token or not jwt_token:
+            return redirect(url_for('login'))
+        app.logger.debug(f"{wrapper.__name__}: Unique ID check: {unique_id}")
+        if not unique_id:
+            app.logger.debug(f"{wrapper.__name__}: Unique ID not found, setting.")
+            email = jwt.decode(jwt_token, jwt_key, algorithms=['RS256'], verify=False)['sub']
+            unique_id = str(uuid.uuid4())
+            data = {'email': email}
+            rc.set(unique_id, data)
+        app.logger.debug(f"{wrapper.__name__}: Unique ID: {unique_id}")
+        # check if jwt is valid
+        app.logger.debug(f"{wrapper.__name__}: Checking if jwt is valid.")
+        jwt_key = key_wallet.get_pub_key(Keys.JWT_TOKEN)
+        jwt_token_valid = JWTHandler.validate_jwt_token(jwt_token, jwt_key, app.logger)
+        app.logger.debug(f"{wrapper.__name__}: JWT Valid: {jwt_token_valid}")
+        if not jwt_token_valid:
+            app.logger.debug(f"{wrapper.__name__}: JWT token not valid.")
+            # if not valid, check if refresh token is valid
+            refresh_key = key_wallet.get_pub_key(Keys.REFRESH_TOKEN)
+            refresh_token_valid = JWTHandler.validate_refresh_token(refresh_token, refresh_key, app.logger)
+            app.logger.debug(f"{wrapper.__name__}: Refresh token valid?: {refresh_token_valid}")
+            if not refresh_token_valid:
+                return redirect(url_for('login'))
+            # if refresh token is valid, call refresh token endpoint
+            app.logger.debug(f"{wrapper.__name__}: Calling refresh token endpoint.")
+            cookies = {'refresh_token': refresh_token, 'unique_id': unique_id, 'jwt_token': jwt_token}
+            app.logger.debug(f"{wrapper.__name__}: Using cookies: {cookies}")
+            response = requests.post(url_for(refresh), cookies=cookies)
+            app.logger.debug(f"{wrapper.__name__}: Response Statuc: {response.status_code}, Refresh content: {response.content}")
+            if response.status_code != 200:
+                return redirect(url_for('login'))
+
+            new_jwt_token = response.cookies.get('jwt_token')
+            new_refresh_token = response.cookies.get('refresh_token')
+            response = make_response(redirect(url_for(f.__name__)))
+            # set new jwt token and refresh token in cookies
+            response.set_cookie('jwt_token', new_jwt_token)
+            response.set_cookie('refresh_token', new_refresh_token)
+            response.set_cookie('unique_id', unique_id)
+            return response, 200
+        return f(*args, **kwargs)
+    wrapper.__name__ = f.__name__
+    return wrapper
+
+
 @app.route('/login')
 def login():
     scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value]
@@ -42,7 +103,7 @@ def login():
     credgen = CredsGenerator(scope)
     credgen.authorize(unique_id)
     app.logger.debug(f"{login.__name__}: request args: {request.args}")
-    data = {'state': credgen.state, 'request_url': request.args.get('next')}
+    data = {'state': credgen.state, 'request_url': request.args.get('next'), 'scopes': scope}
     app.logger.debug(f"{login.__name__}: Data: {data}") 
     rc = RedisHandler()
     rc.set(unique_id, data, app.logger)
@@ -53,13 +114,15 @@ def login():
 @app.route('/oauth2callback/<unique_id>')
 def callback(unique_id):
     app.logger.debug(f"{callback.__name__}: oauth2callback with unique id: {unique_id}")
-    scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value]    
-
     # get state and request_url from redis 
     data = rc.get(unique_id, app.logger)
     state = data.get('state')
     request_url = data.get('request_url') 
-
+    
+    # scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value]    
+    scope = rc.get(unique_id, app.logger).get('scopes')
+    app.logger.debug(f"{callback.__name__}: Scope: {scope}")
+    
     # get credentials from google
     credgen = CredsGenerator(scope)
     app.logger.debug(f"{callback.__name__}: State: {state}, Unique ID: {unique_id}") 
@@ -110,7 +173,8 @@ def callback(unique_id):
             'refresh-id': refresh_id,
             'credentials_encrypted': credentials_encrypted_b64,
             'registered-date': datetime.datetime.now(datetime.timezone.utc),
-            'last-update': datetime.datetime.now(datetime.timezone.utc)
+            'last-update': datetime.datetime.now(datetime.timezone.utc),
+            'scopes': scope,
         }
         post_id = mongo_handler.insert_one(collection, user_record)
         if not post_id:
@@ -125,7 +189,7 @@ def callback(unique_id):
         user_record['refresh-id'] = refresh_id
         user_record['credentials_encrypted'] = credentials_encrypted_b64
         user_record['last-update'] = datetime.datetime.now(datetime.timezone.utc)
-
+        user_record['scopes'] = scope
         post_id = mongo_handler.update_one(collection, query, user_record)
         app.logger.debug(f"{callback.__name__}: User record updated in mongo")
 
@@ -139,6 +203,41 @@ def callback(unique_id):
     response.set_cookie('refresh_token', refresh_token, httponly=True)
 
     return response
+
+@app.route('/upgrade-scope', methods=['POST'])
+@validate_tokens
+def upgrade_scope():
+    """
+        Accepts scopes requested and email id of the user.
+        Queries mongo to fetch the credential of the user.
+        Has the user auhorize the new scopes.
+        Encrypts the new credentials and stores in mongo.
+        Upgrade scopes in mongo.
+    """
+    # fetch data
+    data = request.json()
+    scopes_requested = data.get('scopes')
+    app.logger.debug(f"{upgrade_scope.__name__}: Scopes requested: {scopes_requested}")
+    email = rc.get(request.cookies.get('unique_id'), app.logger).get('email')
+    app.logger.debug(f"{upgrade_scope.__name__}: Email: {email}")
+
+    # fetch user record from mongo
+    db = mongo_handler.get_client('auth')
+    collection = mongo_handler.get_collection(db, 'user_data')
+    query = {'email': email}
+    user_record = mongo_handler.fetch_one(collection, query)
+    app.logger.debug(f"{upgrade_scope.__name__}: User record: {user_record}")
+    if not user_record:
+        return Response("User not found", 404)
+    # Authorize new scopes
+    cred_gen = CredsGenerator(scopes_requested)
+    cred_gen.authorize(request.cookies.get('unique_id'))
+    data = {'state': cred_gen.state, 'request_url': request.args.get('next'), 'scopes': scopes_requested}   
+    rc.set(request.cookies.get('unique_id'), data, app.logger)
+    app.logger.debug(f"{upgrade_scope.__name__}: rc data set: {data}")
+    authorization_url = cred_gen.authorization_url
+    app.logger.debug(f"{upgrade_scope.__name__}: Requesting authorization for new scopes")
+    return redirect(authorization_url)
 
 @app.route('/refresh-token', methods=['POST'])
 def refresh():
@@ -264,6 +363,8 @@ def logout():
         app.logger.debug(f"Error updating user record in mongo: {post_id}")
     app.logger.debug(f"{logout.__name__}: Logged out")
     return Response("Logged out", 200)
+
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port = os.getenv('AUTH_PORT'))
