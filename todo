@@ -21,3 +21,4 @@ Future Enhancements:
 [ ] - CI/CD?
 [ ] - Kafka? 
 [ ] - Keys request to AWS should happen through crypto_service, and services get keys from crypto_service
+[ ] - Identify security mechanism that can be used to allow event_service consumer to send message to msg_service to publish instead of directly publishing themself
