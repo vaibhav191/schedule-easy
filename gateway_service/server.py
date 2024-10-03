@@ -40,7 +40,7 @@ refresh_endpoint = "/refresh-token"
 logout_endpoint = "/logout"
 
 msg_service_address = os.getenv('MSG_HOST', 'msg_service')
-msg_service_port = os.getenv('MSG_SERVICE_PORT')
+msg_service_port = os.getenv('MSG_PORT')
 msg_service_url = f"http://{msg_service_address}:{msg_service_port}"
 publish_event_endpoint = '/publish_message'
 
@@ -135,51 +135,51 @@ def download():
 @server.route("/upload", methods=["POST"])
 @validate_tokens
 def upload():
-    try:
-        # Get the uploaded file from the request
-        uploaded_file = request.files.get("file")
-        server.logger.debug(f"{upload.__name__}: File: {uploaded_file if uploaded_file else 'Not Found'}")
-        if uploaded_file:
-            #uploaded_file.save(os.path.join(os.getcwd(), uploaded_file.filename))
-            if not uploaded_file.filename.lower().endswith(('.xlsx', '.xls')):
-                return Response("Invalid file type. Only .xlsx and .xls files are allowed.", status=400)
-            # take file from request
-            # Check file size
-            
-            # init mongo client
-            db = mongo_handler.get_client('pending_files')
-            if not db:
-                server.logger.debug(f"{upload.__name__} Mongo client DB not found")
-                return Response("Mongo client DB not found", 500)
-            server.logger.debug(f"{upload.__name__} Mongo client DB found, {db}")
-            fs = gridfs.GridFS(db)
-            server.logger.debug(f"{upload.__name__} GridFS: {fs if fs else 'Not Found'}") 
-            # call mongo service for upload
-            fid = fs.put(uploaded_file)
-            server.logger.debug(f"{upload.__name__} File ID: {fid if fid else 'Not Found'}")
-            unique_id = request.cookies.get('unique_id')
-            if not unique_id:
-                jwt_token = request.cookies.get('jwt_token')
-                email = jwt.decode(jwt_token, key_wallet.get_pub_key(Keys.JWT_TOKEN), algorithms=['RS256'], verify=False)['sub']
-            else:
-                email = rc.get(unique_id, server.logger)['email']
-            message = {
-                'fid': str(fid),
-                'email': email
-            }
-            server.logger.debug(f"{upload.__name__} Message: {message}")
-            # send obj to msg_service publisher to eventQ
-            response = requests.post(msg_service_url + publish_event_endpoint, json = {'message': message, 'queue_name': 'eventQ'})
-            if response.status_code != 200:
-                server.logger.debug(f"{upload.__name__} Error posting to EventQ:{response}")
-                return Response(f"Error posting to EventQ:{response}", status = 500)
-            else :
-                server.logger.debug(f"{upload.__name__} Success posting to EventQ. {response.status_code}, {response.content}")
-        server.logger.debug(f"{upload.__name__} Success, exiting.")
-        return Response("Success", status=200)
-    except Exception as e:
-        server.logger.debug(f"{upload.__name__} Error: {str(e)}")
-        return Response(f"Error: {str(e)}", status=500)   
+    # try:
+    # Get the uploaded file from the request
+    uploaded_file = request.files.get("file")
+    server.logger.debug(f"{upload.__name__}: File: {uploaded_file if uploaded_file else 'Not Found'}")
+    if uploaded_file:
+        #uploaded_file.save(os.path.join(os.getcwd(), uploaded_file.filename))
+        if not uploaded_file.filename.lower().endswith(('.xlsx', '.xls')):
+            return Response("Invalid file type. Only .xlsx and .xls files are allowed.", status=400)
+        # take file from request
+        # Check file size
+        
+        # init mongo client
+        db = mongo_handler.get_client('pending_files')
+        if db is None:
+            server.logger.debug(f"{upload.__name__} Mongo client DB not found")
+            return Response("Mongo client DB not found", 500)
+        server.logger.debug(f"{upload.__name__} Mongo client DB found, {db}")
+        fs = gridfs.GridFS(db)
+        server.logger.debug(f"{upload.__name__} GridFS: {fs if fs is not None else 'Not Found'}") 
+        # call mongo service for upload
+        fid = fs.put(uploaded_file)
+        server.logger.debug(f"{upload.__name__} File ID: {fid if fid is not None else 'Not Found'}")
+        unique_id = request.cookies.get('unique_id')
+        if not unique_id:
+            jwt_token = request.cookies.get('jwt_token')
+            email = jwt.decode(jwt_token, key_wallet.get_pub_key(Keys.JWT_TOKEN), algorithms=['RS256'], verify=False)['sub']
+        else:
+            email = rc.get(unique_id, server.logger)['email']
+        message = {
+            'fid': str(fid),
+            'email': email
+        }
+        server.logger.debug(f"{upload.__name__} Message: {message}")
+        # send obj to msg_service publisher to eventQ
+        response = requests.post(msg_service_url + publish_event_endpoint, json = {'message': message, 'queue_name': 'eventQ'})
+        if response.status_code != 200:
+            server.logger.debug(f"{upload.__name__} Error posting to EventQ:{response}")
+            return Response(f"Error posting to EventQ:{response}", status = 500)
+        else :
+            server.logger.debug(f"{upload.__name__} Success posting to EventQ. {response.status_code}, {response.content}")
+    server.logger.debug(f"{upload.__name__} Success, exiting.")
+    return Response("Success", status=200)
+    # except Exception as e:
+    #     server.logger.debug(f"{upload.__name__} Error: {str(e)}")
+    return Response(f"Error: {str(e)}", status=500)   
 
 @server.route("/consume", methods=["POST"])
 def consume():
