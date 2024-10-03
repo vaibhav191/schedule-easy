@@ -84,17 +84,17 @@ def event_consumer(ch, method, properties, body):
     logging.debug(f"{event_consumer.__name__}: File fetched from mongo, obj: {obj if obj else 'Not Found'}")
     # convert to dataframe
     df = pd.read_excel(obj, skiprows = 1)
-    logging.debug(f"{event_consumer.__name__}: Dataframe created from file, df: {df if df else 'Not Found'}")
+    logging.debug(f"{event_consumer.__name__}: Dataframe created from file, df: {df}")
     if len(df) == 0:
         logging.debug(f"{event_consumer.__name__}: No data found in file, exiting.")
         return
     # create_event
     df_result = create_events(cred, df)
     df_result.drop(columns = [df.columns[0]], inplace = True)
-    logging.debug(f"{event_consumer.__name__}: Events created, df_result: {df_result if df_result else 'Not Found'}")
+    logging.debug(f"{event_consumer.__name__}: Events created, df_result: {df_result}")
     # To do - convert dataframe to dict and save in mongo db instead of saving in file
     df_dict = df_result.to_dict()
-    logging.debug(f"{event_consumer.__name__}: Dataframe converted to dict, df_dict: {df_dict if df_dict else 'Not Found'}")
+    logging.debug(f"{event_consumer.__name__}: Dataframe converted to dict, df_dict: {df_dict}")
     # upload result in mongodb
     db = mongo_handler.get_client('results')
     fs = gridfs.GridFS(db) 
@@ -120,6 +120,7 @@ def publish_notification(message, queue_name):
     rabbitmq.close()
 
 def create_events(cred, df):
+    logging.debug(f"{create_events.__name__}: Credentials: {json.dumps(cred)}")
     cred = Credentials.from_authorized_user_info(cred)
     service = build("calendar", "v3", credentials=cred)
     df['Status'] = None
