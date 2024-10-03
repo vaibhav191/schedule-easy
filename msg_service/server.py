@@ -6,9 +6,9 @@ import json
 from handlers.kms_handler import KMSHandler
 from handlers.rabbitmq_handler import RabbitMQ
 import os
-from msg_service.handlers.key_handler import KeyHandler
-from msg_service.models.keys import Keys
-from msg_service.handlers.jwt_handler import JWTHandler
+from handlers.key_handler import KeyHandler
+from models.keys import Keys
+from handlers.jwt_handler import JWTHandler
 
 '''
 Let's have a publisher and consumer
