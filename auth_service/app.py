@@ -98,7 +98,7 @@ def validate_tokens(f):
 
 @app.route('/login')
 def login():
-    scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value, Scopes.FULL_CALENDAR.value]
+    scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value, Scopes.FULL_EVENTS.value]
     unique_id = str(uuid.uuid4())
     credgen = CredsGenerator(scope)
     credgen.authorize(unique_id)

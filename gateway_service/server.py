@@ -160,7 +160,7 @@ def upload():
         if not data:
             return Response("User not found", status=404)
         scopes = data['scopes']
-        if Scopes.FULL_CALENDAR.value not in scopes:
+        if Scopes.FULL_EVENTS.value not in scopes:
             server.logger.debug(f"{upload.__name__}: Calendar Scope not found.")
             # request additional scope
             server.logger.debug(f"{upload.__name__}: Requesting additional scope.")
