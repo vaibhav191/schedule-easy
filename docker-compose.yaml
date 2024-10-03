@@ -14,8 +14,8 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - '${RABBITMQ_AMQP}:5672'
-      - '${RABBITMQ_MGMT}:15672'
+      - '${RABBITMQ_AMQP_PORT}:5672'
+      - '${RABBITMQ_MGMT_PORT}:15672'
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
@@ -81,8 +81,59 @@ services:
       REDIS_HOST: redis
       CRYPTO_PORT: 7070
       CRYPTO_HOST: crypto_service
+      MSG_PORT: ${MSG_PORT}
+      MSG_HOST: msg_service
+
     depends_on:
       - redis
+      - mongo
+
+  msg_service:
+    image: msg_service
+    build:
+      context: ./msg_service
+      dockerfile: Dockerfile
+    ports:
+      - '${MSG_PORT}:9989'
+    environment:
+      MSG_PORT: ${MSG_PORT}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_AMQP_PORT: ${RABBITMQ_AMQP_PORT}
+      RABBITMQ_MGMT_PORT: ${RABBITMQ_MGMT_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      AUTH_KMS_ACCOUNT_ID: ${AUTH_KMS_ACCOUNT_ID}
+      AUTH_KMS_ACCESS_KEY: ${AUTH_KMS_ACCESS_KEY}
+      AUTH_KMS_SECRET_KEY: ${AUTH_KMS_SECRET_KEY}
+      AUTH_KMS_REGION: ${AUTH_KMS_REGION}
+      MSG_APP_MAC_KEYID: ${MSG_APP_MAC_KEYID}
+    depends_on:
+      - rabbitmq
+  
+  event_service:
+    image: event_service
+    build:
+      context: ./event_service
+      dockerfile: Dockerfile
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_AMQP_PORT: ${RABBITMQ_AMQP_PORT}
+      RABBITMQ_MGMT_PORT: ${RABBITMQ_MGMT_PORT}
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      AUTH_KMS_ACCOUNT_ID: ${AUTH_KMS_ACCOUNT_ID}
+      AUTH_KMS_ACCESS_KEY: ${AUTH_KMS_ACCESS_KEY}
+      AUTH_KMS_SECRET_KEY: ${AUTH_KMS_SECRET_KEY}
+      AUTH_KMS_REGION: ${AUTH_KMS_REGION}
+      MSG_APP_MAC_KEYID: ${MSG_APP_MAC_KEYID}
+      CRYPTO_HOST: crypto_service
+      CRYPTO_PORT: ${CRYPTO_PORT}
+      MSG_HOST: msg_service
+      MSG_PORT: ${MSG_PORT}
+      MONGO_ADDRESS: mongo
+      MONGO_PORT: ${MONGO_PORT}
+    depends_on:
+      - rabbitmq
       - mongo
 
 volumes:

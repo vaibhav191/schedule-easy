@@ -1,5 +1,11 @@
-import pika
-import pandas as pd
+import base64
+import logging
+import sys
+from time import sleep
+import traceback
+from flask import Response
+import pandas as pd # type: ignore
+import pika.exceptions # type: ignore
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import gridfs
@@ -12,94 +18,146 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from uuid import uuid4
 import os
-class RabbitMQ:
-    def __init__(self):
-        self.user = 'guest'
-        self.password = 'guest'
-        self.host = 'localhost'
-        self.port = 5672
-        self.connection = None
-        self.channel = None
-        self.properties = pika.BasicProperties(delivery_mode = 2)
-        self.connect()
-        
-    def connect(self):
-        credentials = pika.PlainCredentials(self.user, self.password)
-        parameters = pika.ConnectionParameters(host = self.host, port = self.port, credentials = credentials)
-        self.connection = pika.BlockingConnection(parameters)
-        self.channel = self.connection.channel()
-    
-    def close(self):
-        if self.connection and not self.connection.is_closed:
-            self.connection.close()
-    def consume(self, queue_name, callback):
-        if not self.channel:
-            raise Exception("Connection is not established.")
-        self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
-        self.channel.start_consuming()
-    def publish(self, queue_name, message):
-        if not self.channel:
-            raise Exception("Connection is not established")
-        self.channel.queue_declare(queue = queue_name, durable = True)
-        self.channel.basic_publish(exchange = "", routing_key = queue_name, body = message, properties = self.properties) 
+from handlers.kms_handler import KMSHandler
+from handlers.mongo_handler import MongoDBHandler
+from handlers.rabbitmq_handler import RabbitMQ
+import pika # type: ignore
+import pickle
+# pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+kms = KMSHandler()
+mongo_handler = MongoDBHandler()
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+status = False
+try_count = 0
+
+while not status and try_count < 10:
+    try:
+        rabbitmq = RabbitMQ()
+        logging.debug(f"RabbitMQ connection established.")
+        status = True
+    except pika.exceptions.AMQPConnectionError:
+        logging.debug(f"RabbitMQ connection failed. Retrying...")
+        status = False
+        try_count += 1
+        sleep(5)
+    except Exception as e:
+        logging.debug(f"Error: {str(e)}")
+        logging.debug(f"{traceback.format_exc()}")
+        rabbitmq.close()
+        sys.exit(1)
+if not status:
+    logging.debug(f"RabbitMQ connection failed. Exiting...")
+    sys.exit(1)
+
+crypto_host = os.getenv('CRYPTO_HOST')
+crypto_port = os.getenv('CRYPTO_PORT')
+crypto_url = f"http://{crypto_host}:{crypto_port}"
+decrypt_endpoint = "/decrypt"
+
+msg_host = os.getenv('MSG_HOST')
+msg_port = os.getenv('MSG_PORT')
+msg_url = f"http://{msg_host}:{msg_port}"
+publish_message_endpoint = "/publish_message"
+
 '''
 event consumer will create a request to event_service
 '''
-def event_consumer(ch, method, properties, body):
-    if type(body) == bytes:
-        body = body.decode('utf-8')
-    body = json.loads(body)
-    fid_read = ObjectId(body['fid'])
-    jwt_encoded = body['jwt']
-    email = body['email']
-    decoded_jwt_response = requests.get("http://127.0.0.1:5000/decode-jwt", json = {'encoded_jwt': jwt_encoded})
-    decoded_jwt = json.loads(decoded_jwt_response.text)
-    cred = decoded_jwt['cred']
-    # init mongo client
-    client = MongoClient("mongodb://localhost:27017")
-    event_req_coll = client['event_automation']
-    if not client:
-        
-        return Response("Mongo client not found", 500)
-    fs = gridfs.GridFS(event_req_coll) 
-    # get file content from mongo
-    obj = fs.get(fid_read)
-    # convert to dataframe
-    df = pd.read_excel(obj, skiprows = 1)
-    # create_event
-    df_result = create_events(cred, df)
-    df_result.drop(columns = [df.columns[0]], inplace = True)
-    file_name = "Event_results_" + str(uuid4()) + '.xlsx'
-    df_result.to_excel(file_name)
-    
-    # upload result in mongodb
-    client = MongoClient("mongodb://localhost:27017")
-    event_req_coll = client['event_automation']
-    if not client:
-        
-        return Response("Mongo client not found", 500)
-    fs = gridfs.GridFS(event_req_coll) 
-    # delete temp file created
-    file_path = os.path.join(os.getcwd(), file_name)
-    with open(file_path, "rb") as f:
-        file_content = f.read()
-    fid_write = fs.put(file_content)
-    if os.path.exists(file_path):
-        os.remove(file_path)
-        
-    # delete file from mongo
-    fs.delete(fid_read)
-    
-    # publish fileid in notificationQ
-    publish_notification(email, str(fid_write))
-    
 
-def publish_notification(email, fid):
-    rabbitmq = RabbitMQ()
-    rabbitmq.publish(queue_name = "notificationQ", message = json.dumps({'fid':fid, 'email': email})) 
-    rabbitmq.close()
+def event_consumer(ch, method, properties, body):
+    try:
+        body = json.loads(body)
+        logging.debug(f"{event_consumer.__name__}: {body}")
+        message_b64 = body['message']
+        message_hash_b64 = body['hash']
+        message_hash_bytes = base64.b64decode(message_hash_b64)
+        # validate the hash of the message_b64
+        hash_bytes = kms.generate_hmac(message_b64, kms.eventQ_mac_keyId)
+        logging.debug(f"{event_consumer.__name__} message_hash_bytes: {message_hash_bytes}")
+        logging.debug(f"{event_consumer.__name__} hash_bytes: {hash_bytes}")
+        if hash_bytes != message_hash_bytes:
+            logging.debug(f"{event_consumer.__name__}: Hashes do not match.")
+            return
+        # if valid, decode the b64 message
+        message_json = base64.b64decode(message_b64).decode('utf-8') # gives string
+        logging.debug(f"{event_consumer.__name__} decoded message json: {message_json}")
+        message = json.loads(message_json)
+        fid = message['fid']
+        email = message['email']
+        fid_read = ObjectId(fid)
+        # fetch cred using email id from mongo
+        client = mongo_handler.get_client('auth')
+        collection = mongo_handler.get_collection(client, 'user_data')
+        query = {'email': email}
+        data = mongo_handler.fetch_one(collection, query)
+        if not data:
+            logging.debug(f"{event_consumer.__name__}: No data found for email: {email}, data fetched: {data if data else 'Not Found'}, db: {client}, collection: {collection}")
+            return
+        cred_encrypted_b64 = data['credentials_encrypted']
+        # decrypt the cred using auth_service
+        data = {
+            'key_name': 'OAUTH_CREDENTIALS',
+            'ciphertext': cred_encrypted_b64
+        }
+        response = requests.post(crypto_url + decrypt_endpoint, json = data)
+        if response.status_code != 200:
+            logging.debug(f"{event_consumer.__name__}: Error decrypting credentials, status code: {response.status_code}, response: {response.content}")
+            return
+        resp_json = response.json()
+        cred_b64 = resp_json['plaintext']
+        logging.debug(f"{event_consumer.__name__}: Credentials decrypted, cred_b64: {cred_b64}")
+        cred = json.loads(base64.b64decode(cred_b64).decode('utf-8'))
+        logging.debug(f"{event_consumer.__name__}: Credentials decrypted, cred: {cred if cred is not None else 'Not Found'}")
+        # init mongo client fetch file from mongo
+        db = mongo_handler.get_client('pending_files') 
+        fs = gridfs.GridFS(db)
+        # get file content from mongo
+        obj = fs.get(fid_read)
+        logging.debug(f"{event_consumer.__name__}: File fetched from mongo, obj: {obj if obj else 'Not Found'}")
+        # convert to dataframe
+        df = pd.read_excel(obj, skiprows = 1)
+        logging.debug(f"{event_consumer.__name__}: Dataframe created from file, df: {df}")
+        if len(df) == 0:
+            logging.debug(f"{event_consumer.__name__}: No data found in file, exiting.")
+            return
+        # create_event
+        df_result = create_events(cred, df)
+        df_result.drop(columns = [df.columns[0]], inplace = True)
+        logging.debug(f"{event_consumer.__name__}: Events created, df_result: {df_result}")
+        # To do - convert dataframe to dict and save in mongo db instead of saving in file
+        df_dict = df_result.to_dict()
+        logging.debug(f"{event_consumer.__name__}: Dataframe converted to dict, df_dict: {df_dict}")
+        df_dict_pickle = pickle.dumps(df_dict)
+        # upload result in mongodb
+        db = mongo_handler.get_client('results')
+        fs = gridfs.GridFS(db) 
+        # df_dict_json = json.dumps(df_dict)
+        fid_results = fs.put(df_dict_pickle)
+        logging.debug(f"{event_consumer.__name__}: Results uploaded to mongo, fid_results: {fid_results if fid_results is not None else 'Not Found'}")
+        # delete file from mongo
+        fs.delete(fid_read)
+        logging.debug(f"{event_consumer.__name__}: File deleted from mongo, fid_read: {fid_read if fid_read is not None else 'Not Found'}")
+        # send a post request to msg_service to put this message in notificationQ
+        data = {
+            'fid': str(fid_results),
+            'email': email
+        }
+        # publish fileid in notificationQ
+        logging.debug(f"{event_consumer.__name__}: Publishing notification, data: {data}")
+        publish_notification(data, 'notificationQ') 
+        logging.debug(f"{event_consumer.__name__}: Notification published successfully. Exiting.")
+    except Exception as e:
+        logging.debug(f"{event_consumer.__name__}: Error: {str(e)}")
+        logging.debug(f"{event_consumer.__name__}: {traceback.format_exc()}")
+        rabbitmq.close() 
+        return
+
+def publish_notification(message, queue_name):
+    rabbitmq.publish(queue_name = queue_name, message = json.dumps(message)) 
 
 def create_events(cred, df):
+    logging.debug(f"{create_events.__name__}: Credentials: {json.dumps(cred)}")
     cred = Credentials.from_authorized_user_info(cred)
     service = build("calendar", "v3", credentials=cred)
     df['Status'] = None
@@ -124,5 +182,4 @@ def create_events(cred, df):
     return df
 
 if __name__ == '__main__':
-    rabbitmq = RabbitMQ()
     rabbitmq.consume('eventQ', event_consumer)

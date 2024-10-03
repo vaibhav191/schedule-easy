@@ -65,6 +65,10 @@ def consumer(ch, method, properties, body):
     if not client:
         return Response("Mongo client not found", 500)
     fs = gridfs.GridFS(event_req_coll) 
+    # To do
+        # get dict from mongo instead of file
+        # convert dict to dataframe and save as excel
+
     # get file from mongo
     obj = fs.get(fid)
     # create temp file

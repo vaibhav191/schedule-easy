@@ -99,6 +99,18 @@
                     alert("File uploaded successfully!");
                     console.log('File uploaded successfully!');
                 } 
+                else if (response.status >= 300 && response.status < 400){
+                    console.log('Response:', response);
+                    console.log('Redirecting to:', response.headers.get('Location'));
+                    const redirectUrl = response.headers.get('Location');
+                    if (redirectUrl) {
+                        window.location.href = redirectUrl;
+                    } else {
+                        alert("Redirect URL not found in response headers.");
+                        console.error('Redirect URL not found in response headers.');
+                    }
+
+                }
                 else {
                     if (response.status==400){
                         alert("Ensure file is '.xlsx' or '.xls' and file size < 2MB");

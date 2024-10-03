@@ -19,14 +19,16 @@ class KMSHandler:
         resp = self.client.encrypt(KeyId = keyId, Plaintext = data, EncryptionContext = {'context': 'google_app_cred'})
         if 'CiphertextBlob' in resp:
             return resp['CiphertextBlob']
-        return None
+        return False
 
     def decrypt(self, data: bytes, keyId) -> bytes:
         resp = self.client.decrypt(CiphertextBlob = data, KeyId = keyId, EncryptionContext = {'context': 'google_app_cred'})
         if 'Plaintext' in resp:
             return resp['Plaintext']
-        return None
+        return False
+
     def generate_hmac(self, data: bytes, keyId) -> bytes:
         resp = self.client.generate_mac(Message = data, KeyId = keyId, MacAlgorithm = 'HMAC_SHA_256', DryRun = False)
         if 'Mac' in resp:
             return resp['Mac']
+        return False

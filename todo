@@ -1,6 +1,26 @@
-1. Implement MongoDB handler and RedisHandler in case its not done
-2. Implement Encryption of Credentials then storage to MongoDB along with other necessary user data
-3. Convertion Unique_id to session_id in auth_service
-4. Change EC to RSA encryption, store secrets in a different folder /secrets
-5. Implement encrypt and decrypt for the encryption to work on jwt and credentials
-6. implement jwt
+[X] - Implement MongoDB handler and RedisHandler in case its not done
+[X] - Implement Encryption of Credentials then storage to MongoDB along with other necessary user data
+[ ] - Convertion Unique_id to session_id in auth_service
+[X] - Change EC to RSA encryption, store secrets in a different folder /secrets
+[X] - Implement encrypt and decrypt for the encryption to work on jwt and credentials
+[X] - implement jwt
+[ ] - Pending Services Corrections:
+    [X] - gateway_service
+        [X] - implement upload once msg_service is done 
+    [ ] - event_service
+    [X] - msg_service
+    [ ] - notification_service
+[X] - Hash the messages before pushing them to the Q
+
+Future Enhancements:
+[ ] - Change simple hashing for messages to hashing using Pseudo Random Functions
+[ ] - Encrypt user's email before storing in MongoDB
+[ ] - ECC encryption instead of RSA
+[ ] - AWS Lambda?
+[ ] - AWS MessageQ?
+[ ] - CI/CD?
+[ ] - Kafka? 
+[ ] - Keys request to AWS should happen through crypto_service, and services get keys from crypto_service
+[ ] - Identify security mechanism that can be used to allow event_service consumer to send message to msg_service to publish instead of directly publishing themself
+[ ] - Implement Incremental authorization instead of full scope during login
+[ ] - Change json to pickle wherever suitable

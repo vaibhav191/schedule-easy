@@ -36,8 +36,9 @@ class CredsGenerator:
         # decrypt the encrypted app credentials using AWS KMS
         encrypted_app_cred = os.getenv("ENCRYPTED_GOOGLE_APP_CRED")
         encrypted_app_cred_bytes = base64.b64decode(encrypted_app_cred)
+        # key should come from requesting from crypto_service
         kms = KMSHandler()
-        self.CLIENT_SECRETS: str = kms.decrypt(encrypted_app_cred_bytes).decode('utf-8')
+        self.CLIENT_SECRETS: str = kms.decrypt(encrypted_app_cred_bytes, kms.google_auth_credentials_keyId).decode('utf-8')
         self.CLIENT_SECRETS: Dict[str: str] = json.loads(self.CLIENT_SECRETS)
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
