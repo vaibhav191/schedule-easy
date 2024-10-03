@@ -143,8 +143,15 @@ def event_consumer(ch, method, properties, body):
             'fid': str(fid_results),
             'email': email
         }
+        data_json = json.dumps(data)
+        data_bytes = data_json.encode('utf-8')
+        data_b64 = base64.b64encode(data_bytes).decode('utf-8')
         # hash the data
-
+        data_hmac = kms.generate_hmac(data_b64, kms.notificationQ_mac_keyId)
+        data = {
+            'message': data_b64,
+            'hash': base64.b64encode(data_hmac).decode('utf-8')
+        }
         # publish fileid in notificationQ
         logging.debug(f"{event_consumer.__name__}: Publishing notification, data: {data}")
         publish_notification(data, 'notificationQ') 
