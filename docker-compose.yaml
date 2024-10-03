@@ -125,13 +125,16 @@ services:
       AUTH_KMS_ACCESS_KEY: ${AUTH_KMS_ACCESS_KEY}
       AUTH_KMS_SECRET_KEY: ${AUTH_KMS_SECRET_KEY}
       AUTH_KMS_REGION: ${AUTH_KMS_REGION}
-      EVENT_APP_MAC_KEYID: ${EVENT_APP_MAC_KEYID}
+      MSG_APP_MAC_KEYID: ${MSG_APP_MAC_KEYID}
       CRYPTO_HOST: crypto_service
-      CRYOTO_PORT: ${CRYOTO_PORT}
+      CRYPTO_PORT: ${CRYPTO_PORT}
       MSG_HOST: msg_service
       MSG_PORT: ${MSG_PORT}
+      MONGO_ADDRESS: mongo
+      MONGO_PORT: ${MONGO_PORT}
     depends_on:
       - rabbitmq
+      - mongo
 
 volumes:
   redis-data:
