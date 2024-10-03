@@ -5,7 +5,7 @@ from time import sleep
 import traceback
 from flask import Response
 import pandas as pd # type: ignore
-import pika.exceptions
+import pika.exceptions # type: ignore
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import gridfs
@@ -21,7 +21,7 @@ import os
 from handlers.kms_handler import KMSHandler
 from handlers.mongo_handler import MongoDBHandler
 from handlers.rabbitmq_handler import RabbitMQ
-import pika
+import pika # type: ignore
 import pickle
 # pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
