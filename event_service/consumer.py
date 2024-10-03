@@ -143,6 +143,8 @@ def event_consumer(ch, method, properties, body):
             'fid': str(fid_results),
             'email': email
         }
+        # hash the data
+
         # publish fileid in notificationQ
         logging.debug(f"{event_consumer.__name__}: Publishing notification, data: {data}")
         publish_notification(data, 'notificationQ') 
