@@ -1,9 +1,11 @@
 import base64
 import logging
 import sys
+from time import sleep
 import traceback
 from flask import Response
 import pandas as pd # type: ignore
+import pika.exceptions
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import gridfs
@@ -19,12 +21,35 @@ import os
 from handlers.kms_handler import KMSHandler
 from handlers.mongo_handler import MongoDBHandler
 from handlers.rabbitmq_handler import RabbitMQ
+import pika
+import pickle
 # pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
 kms = KMSHandler()
 mongo_handler = MongoDBHandler()
-rabbitmq = RabbitMQ()
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+status = False
+try_count = 0
+
+while not status and try_count < 10:
+    try:
+        rabbitmq = RabbitMQ()
+        logging.debug(f"RabbitMQ connection established.")
+        status = True
+    except pika.exceptions.AMQPConnectionError:
+        logging.debug(f"RabbitMQ connection failed. Retrying...")
+        status = False
+        try_count += 1
+        sleep(5)
+    except Exception as e:
+        logging.debug(f"Error: {str(e)}")
+        logging.debug(f"{traceback.format_exc()}")
+        rabbitmq.close()
+        sys.exit(1)
+if not status:
+    logging.debug(f"RabbitMQ connection failed. Exiting...")
+    sys.exit(1)
 
 crypto_host = os.getenv('CRYPTO_HOST')
 crypto_port = os.getenv('CRYPTO_PORT')
@@ -103,11 +128,12 @@ def event_consumer(ch, method, properties, body):
         # To do - convert dataframe to dict and save in mongo db instead of saving in file
         df_dict = df_result.to_dict()
         logging.debug(f"{event_consumer.__name__}: Dataframe converted to dict, df_dict: {df_dict}")
+        df_dict_pickle = pickle.dumps(df_dict)
         # upload result in mongodb
         db = mongo_handler.get_client('results')
         fs = gridfs.GridFS(db) 
-        df_dict_json = json.dumps(df_dict)
-        fid_results = fs.put(df_dict_json)
+        # df_dict_json = json.dumps(df_dict)
+        fid_results = fs.put(df_dict_pickle)
         logging.debug(f"{event_consumer.__name__}: Results uploaded to mongo, fid_results: {fid_results if fid_results is not None else 'Not Found'}")
         # delete file from mongo
         fs.delete(fid_read)
