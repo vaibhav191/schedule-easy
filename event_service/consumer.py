@@ -19,6 +19,7 @@ from handlers.kms_handler import KMSHandler
 from handlers.mongo_handler import MongoDBHandler
 from handlers.rabbitmq_handler import RabbitMQ
 # pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
 kms = KMSHandler()
 mongo_handler = MongoDBHandler()
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

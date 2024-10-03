@@ -24,7 +24,6 @@ class MongoDBHandler:
     def __init__(self):
         self.address = os.getenv('MONGO_ADDRESS', 'mongo')
         self.port = os.getenv('MONGO_PORT')
-
     
     def get_client(self, db: str) -> Database:
         client: MongoClient = MongoClient(self.address + ':' + self.port)
