@@ -12,7 +12,7 @@ class KMSHandler:
         # keys
         self.google_auth_credentials_keyId = os.getenv('AUTH_APP_CREDENTIALS_KEYID')
         self.eventQ_mac_keyId = os.getenv('MSG_APP_MAC_KEYID')
-        
+        self.notificationQ_mac_keyId = os.getenv('NOTIFICATION_APP_MAC_KEYID')
         self.client = boto3.client('kms', region_name = self.region, aws_access_key_id = self.access_key, aws_secret_access_key = self.secret_key)
     
     def encrypt(self, data: bytes, keyId) -> bytes:
