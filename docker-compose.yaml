@@ -14,8 +14,8 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - '${RABBITMQ_AMQP}:5672'
-      - '${RABBITMQ_MGMT}:15672'
+      - '${RABBITMQ_AMQP_PORT}:5672'
+      - '${RABBITMQ_MGMT_PORT}:15672'
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
@@ -106,7 +106,7 @@ services:
       AUTH_KMS_ACCESS_KEY: ${AUTH_KMS_ACCESS_KEY}
       AUTH_KMS_SECRET_KEY: ${AUTH_KMS_SECRET_KEY}
       AUTH_KMS_REGION: ${AUTH_KMS_REGION}
-      MSG_APP_CREDENTIALS_KEYID: ${MSG_APP_CREDENTIALS_KEYID}
+      MSG_APP_MAC_KEYID: ${MSG_APP_MAC_KEYID}
     depends_on:
       - rabbitmq
 
