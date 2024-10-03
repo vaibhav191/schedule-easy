@@ -138,6 +138,7 @@ def upload():
     try:
         # Get the uploaded file from the request
         uploaded_file = request.files.get("file")
+        server.logger.debug(f"{upload.__name__}: File: {uploaded_file if uploaded_file else 'Not Found'}")
         if uploaded_file:
             #uploaded_file.save(os.path.join(os.getcwd(), uploaded_file.filename))
             if not uploaded_file.filename.lower().endswith(('.xlsx', '.xls')):
@@ -146,13 +147,16 @@ def upload():
             # Check file size
             
             # init mongo client
-            db = mongo_handler.get_client('event_automation')
+            db = mongo_handler.get_client('pending_files')
             if not db:
                 server.logger.debug(f"{upload.__name__} Mongo client DB not found")
                 return Response("Mongo client DB not found", 500)
-            fs = gridfs.GridFS(db) 
+            server.logger.debug(f"{upload.__name__} Mongo client DB found, {db}")
+            fs = gridfs.GridFS(db)
+            server.logger.debug(f"{upload.__name__} GridFS: {fs if fs else 'Not Found'}") 
             # call mongo service for upload
             fid = fs.put(uploaded_file)
+            server.logger.debug(f"{upload.__name__} File ID: {fid if fid else 'Not Found'}")
             unique_id = request.cookies.get('unique_id')
             if not unique_id:
                 jwt_token = request.cookies.get('jwt_token')
@@ -163,6 +167,7 @@ def upload():
                 'fid': str(fid),
                 'email': email
             }
+            server.logger.debug(f"{upload.__name__} Message: {message}")
             # send obj to msg_service publisher to eventQ
             response = requests.post(msg_service_url + publish_event_endpoint, json = {'message': message, 'queue_name': 'eventQ'})
             if response.status_code != 200:
@@ -170,6 +175,7 @@ def upload():
                 return Response(f"Error posting to EventQ:{response}", status = 500)
             else :
                 server.logger.debug(f"{upload.__name__} Success posting to EventQ. {response.status_code}, {response.content}")
+        server.logger.debug(f"{upload.__name__} Success, exiting.")
         return Response("Success", status=200)
     except Exception as e:
         server.logger.debug(f"{upload.__name__} Error: {str(e)}")
