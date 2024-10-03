@@ -5,12 +5,12 @@
 [X] - Implement encrypt and decrypt for the encryption to work on jwt and credentials
 [X] - implement jwt
 [ ] - Pending Services Corrections:
-    [ ] - gateway_service
-            - Implement upload once msg_service is done 
+    [X] - gateway_service
+        [X] - implement upload once msg_service is done 
     [ ] - event_service
-    [ ] - msg_service
+    [X] - msg_service
     [ ] - notification_service
-[ ] - Hash the messages before pushing them to the Q
+[X] - Hash the messages before pushing them to the Q
 
 Future Enhancements:
 [ ] - Change simple hashing for messages to hashing using Pseudo Random Functions
