@@ -144,6 +144,7 @@ def upload():
     server.logger.debug(f"{upload.__name__}: File: {uploaded_file if uploaded_file else 'Not Found'}")
     if uploaded_file:
         # get email from redis
+        unique_id = request.cookies.get('unique_id')
         if not unique_id:
             jwt_token = request.cookies.get('jwt_token')
             email = jwt.decode(jwt_token, key_wallet.get_pub_key(Keys.JWT_TOKEN), algorithms=['RS256'], verify=False)['sub']
@@ -158,20 +159,15 @@ def upload():
         server.logger.debug(f"{upload.__name__}: Data user_record: {data}")
         if not data:
             return Response("User not found", status=404)
-        scopes = data['scope']
+        scopes = data['scopes']
         if Scopes.FULL_CALENDAR.value not in scopes:
             server.logger.debug(f"{upload.__name__}: Calendar Scope not found.")
             # request additional scope
             server.logger.debug(f"{upload.__name__}: Requesting additional scope.")
-            if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
-                scopes_requested = scopes + [Scopes.FULL_CALENDAR.value]
-                return redirect(f"http://127.0.0.1:5000{upgrade_scope_endpoint}?next=/main", json = {'scopes': scopes_requested})
-            return redirect(auth_service_url + upgrade_scope_endpoint + "?next=/main", json = {'scopes': scopes})
+            return Response("Scope not found.", status=500)
         # uploaded_file.save(os.path.join(os.getcwd(), uploaded_file.filename))
         if not uploaded_file.filename.lower().endswith(('.xlsx', '.xls')):
             return Response("Invalid file type. Only .xlsx and .xls files are allowed.", status=400)
-        # take file from request
-        # Check file size
         
         # init mongo client
         db = mongo_handler.get_client('pending_files')
@@ -179,12 +175,12 @@ def upload():
             server.logger.debug(f"{upload.__name__} Mongo client DB not found")
             return Response("Mongo client DB not found", 500)
         server.logger.debug(f"{upload.__name__} Mongo client DB found, {db}")
+        # init gridfs
         fs = gridfs.GridFS(db)
         server.logger.debug(f"{upload.__name__} GridFS: {fs if fs is not None else 'Not Found'}") 
-        # call mongo service for upload
+        # insert into mongo
         fid = fs.put(uploaded_file)
         server.logger.debug(f"{upload.__name__} File ID: {fid if fid is not None else 'Not Found'}")
-        unique_id = request.cookies.get('unique_id')
         # generate message for eventQ
         message = {
             'fid': str(fid),

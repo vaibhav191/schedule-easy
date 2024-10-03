@@ -98,7 +98,7 @@ def validate_tokens(f):
 
 @app.route('/login')
 def login():
-    scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value]
+    scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value, Scopes.FULL_CALENDAR.value]
     unique_id = str(uuid.uuid4())
     credgen = CredsGenerator(scope)
     credgen.authorize(unique_id)
@@ -204,8 +204,7 @@ def callback(unique_id):
 
     return response
 
-@app.route('/upgrade-scope', methods=['POST'])
-@validate_tokens
+@app.route('/upgrade-scope')
 def upgrade_scope():
     """
         Accepts scopes requested and email id of the user.
@@ -215,7 +214,8 @@ def upgrade_scope():
         Upgrade scopes in mongo.
     """
     # fetch data
-    data = request.json()
+    app.logger.debug(f"{upgrade_scope.__name__}: Inside upgrade scope")
+    data = request.args
     scopes_requested = data.get('scopes')
     app.logger.debug(f"{upgrade_scope.__name__}: Scopes requested: {scopes_requested}")
     email = rc.get(request.cookies.get('unique_id'), app.logger).get('email')
