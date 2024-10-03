@@ -26,6 +26,7 @@ class JWTHandler:
     def validate_jwt_token(jwt_token: str, jwt_pub_key: bytes, logger: Logger):
         try:
             data = jwt.decode(jwt_token, jwt_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
+            logger.debug(f"{__class__.__name__}: Data: {data if data else 'No data found'}")
             if data['tkn'] != "auth token":
                 logger.debug(f"{__class__.__name__}: Invalid token type, expected auth token, received: {data['tkn']}")
                 return False
@@ -47,6 +48,7 @@ class JWTHandler:
     def validate_refresh_token(refresh_token: str, refresh_pub_key: bytes, logger: Logger):
         try:
             data = jwt.decode(refresh_token, refresh_pub_key, algorithms=['RS256'], issuer="schedule-easy/auth-service", audience="schedule-easy/*")
+            logger.debug(f"{__class__.__name__}: Data: {data if data else 'No data found'}")
             if data['tkn'] != "refresh token":
                 logger.debug(f"{__class__.__name__}: Invalid token type, expected refresh token, received: {data['tkn']}")
                 return False
