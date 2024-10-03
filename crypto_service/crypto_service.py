@@ -341,12 +341,19 @@ def decrypt():
     if ciphertext_base64_encoded is None:
         
         return "Bad Request: ciphertext required", 400
-
+    
     ciphertext: bytes = base64.b64decode(ciphertext_base64_encoded)
     
-    plaintext: bytes = CryptoUtils.decrypt(ciphertext, key_name)
+    # check with length of ciphertext if it is block cipher or not
+    if len(ciphertext) == 256:
+        plaintext: bytes = CryptoUtils.decrypt(ciphertext, key_name)
+        plaintext_base64 = base64.b64encode(plaintext).decode('utf-8')
+        return jsonify({"plaintext": plaintext_base64}), 200
     
-    
+    # else its a block cipher, iterate and generate plaintext
+    plaintext = b''
+    for i in range(0, len(ciphertext), 256):
+        plaintext += CryptoUtils.decrypt(ciphertext[i:i+256], key_name)
     plaintext_base64 = base64.b64encode(plaintext).decode('utf-8')
     return jsonify({"plaintext": plaintext_base64}), 200
 
