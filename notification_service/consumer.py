@@ -16,6 +16,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 from handlers.rabbitmq_handler import RabbitMQ
 import smtplib
+import pickle
 '''
 Notification consumer will check for messages in notificationQ, once a message is found:
     1. Take message -> fid, email
@@ -57,9 +58,6 @@ consumer ->
     3. email tempfile.xlsx:W
 '''
 def consumer(ch, method, properties, body):
-    if type(body) == bytes:
-        body = body.decode('utf-8')
-    body = json.loads(body)
     fid = ObjectId(body['fid'])
     email = body['email']
     # init mongo client
