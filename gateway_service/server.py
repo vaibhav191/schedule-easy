@@ -119,7 +119,7 @@ def home():
     if jwt_token and refresh_token and unique_id:
         server.logger.debug(f"{home.__name__}: Redirecting to main.")
         return redirect(url_for('main'))
-    return render_template("home.html")
+    return render_template("home.html", auth_host = "127.0.0.1", auth_port = auth_service_port)
 
 @server.route("/main", methods=["GET"])
 @validate_tokens
