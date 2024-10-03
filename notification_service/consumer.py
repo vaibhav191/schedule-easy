@@ -1,6 +1,11 @@
+import logging
+import os
+import sys
+from time import sleep
+import traceback
 from uuid import uuid4
 from flask import Response
-import pika
+import pika # type: ignore
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 import gridfs
@@ -9,6 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from handlers.rabbitmq_handler import RabbitMQ
 import smtplib
 '''
 Notification consumer will check for messages in notificationQ, once a message is found:
@@ -16,36 +22,33 @@ Notification consumer will check for messages in notificationQ, once a message i
     2. get fid object, convert to temp file (if needed)
     3. email the file to user, delete the temp file (if created)
 '''
-class RabbitMQ:
-    def __init__(self):
-        self.user = 'guest'
-        self.password = 'guest'
-        self.host = 'localhost'
-        self.port = 5672
-        self.connection = None
-        self.channel = None
-        self.properties = pika.BasicProperties(delivery_mode = 2)
-        self.connect()
-        
-    def connect(self):
-        credentials = pika.PlainCredentials(self.user, self.password)
-        parameters = pika.ConnectionParameters(host = self.host, port = self.port, credentials = credentials)
-        self.connection = pika.BlockingConnection(parameters)
-        self.channel = self.connection.channel()
-    
-    def close(self):
-        if self.connection and not self.connection.is_closed:
-            self.connection.close()
-    def consume(self, queue_name, callback):
-        if not self.channel:
-            raise Exception("Connection is not established.")
-        self.channel.basic_consume(queue=queue_name, on_message_callback=callback, auto_ack=True)
-        self.channel.start_consuming()
-    def publish(self, queue_name, message):
-        if not self.channel:
-            raise Exception("Connection is not established")
-        self.channel.queue_declare(queue = queue_name, durable = True)
-        self.channel.basic_publish(exchange = "", routing_key = queue_name, body = message, properties = self.properties) 
+
+notification_email_id = os.getenv('NOTIFICATION_EMAIL_ID')
+notification_email_password = os.getenv('NOTIFICATION_EMAIL_PASSWORD')
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+status = False
+try_count = 0
+
+while not status and try_count < 10:
+    try:
+        rabbitmq = RabbitMQ()
+        logging.debug(f"RabbitMQ connection established.")
+        status = True
+    except pika.exceptions.AMQPConnectionError:
+        logging.debug(f"RabbitMQ connection failed. Retrying...")
+        status = False
+        try_count += 1
+        sleep(5)
+    except Exception as e:
+        logging.debug(f"Error: {str(e)}")
+        logging.debug(f"{traceback.format_exc()}")
+        rabbitmq.close()
+        sys.exit(1)
+if not status:
+    logging.debug(f"RabbitMQ connection failed. Exiting...")
+    sys.exit(1)
+
 
 '''
 consumer ->
@@ -75,7 +78,7 @@ def consumer(ch, method, properties, body):
     # df = pd.read_excel(obj)
     # df.to_excel('Results_'+str(uuid4)+'.xlsx')
     # email file
-    mailer('eventautomation.do.not.reply@gmail.com', 'nnsornbudehheehz', email, obj)
+    mailer(notification_email_id, notification_email_password, email, obj)
     # delete temp file
     fs.delete(fid)
 
@@ -106,5 +109,4 @@ def mailer(username, password, email_receiver, file_obj):
 
 
 if __name__ == '__main__':
-    rabbitmq = RabbitMQ()
     rabbitmq.consume('notificationQ', consumer)
