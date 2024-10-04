@@ -129,6 +129,7 @@ def event_consumer(ch, method, properties, body):
         df_dict = df_result.to_dict()
         logging.debug(f"{event_consumer.__name__}: Dataframe converted to dict, df_dict: {df_dict}")
         df_dict_pickle = pickle.dumps(df_dict)
+        logging.debug(f"{event_consumer.__name__}: Dataframe dict pickled, df_dict_pickle: {df_dict_pickle}")
         # upload result in mongodb
         db = mongo_handler.get_client('results')
         fs = gridfs.GridFS(db) 
@@ -143,8 +144,15 @@ def event_consumer(ch, method, properties, body):
             'fid': str(fid_results),
             'email': email
         }
+        data_json = json.dumps(data)
+        data_bytes = data_json.encode('utf-8')
+        data_b64 = base64.b64encode(data_bytes).decode('utf-8')
         # hash the data
-
+        data_hmac = kms.generate_hmac(data_b64, kms.notificationQ_mac_keyId)
+        data = {
+            'message': data_b64,
+            'hash': base64.b64encode(data_hmac).decode('utf-8')
+        }
         # publish fileid in notificationQ
         logging.debug(f"{event_consumer.__name__}: Publishing notification, data: {data}")
         publish_notification(data, 'notificationQ') 
