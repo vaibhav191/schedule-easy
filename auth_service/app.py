@@ -36,7 +36,10 @@ key_wallet = KeyHandler()
 crypto_handler = CryptoHandler()
 mongo_handler = MongoDBHandler()
 rc = RedisHandler()
-
+gateway_host = os.getenv('GATEWAY_HOST')
+gateway_port = os.getenv('GATEWAY_PORT')
+gateway_url = f"http://{gateway_host}:{gateway_port}"
+site_domain = os.getenv('SITE_DOMAIN')
 
 def validate_tokens(f):
     def wrapper(*args, **kwargs):
@@ -197,7 +200,7 @@ def callback(unique_id):
     app.logger.debug(f"{callback.__name__}: User record: {user_record}")
     app.logger.debug(f"{callback.__name__}: Post ID: {post_id}")
     app.logger.debug(f"{callback.__name__}: Unique ID: {unique_id}")
-    response = make_response(redirect(f"http://127.0.0.1:8080{request_url if request_url is not None else '/'}"))
+    response = make_response(redirect(request_url if request_url is not None else site_domain))
     response.set_cookie('unique_id',unique_id, httponly=True)
     response.set_cookie('jwt_token', jwt_token, httponly=True)
     response.set_cookie('refresh_token', refresh_token, httponly=True)
