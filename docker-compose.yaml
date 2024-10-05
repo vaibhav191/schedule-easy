@@ -37,6 +37,9 @@ services:
       - '${NGINX_PORT}:80'
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf 
+    depends_on:
+      - gateway_service
+      - auth_service
 
 # To do: Ensure all crypto_service share the same volume or use AWS KMS to fetch key
   crypto_service:
@@ -69,6 +72,9 @@ services:
       CRYPTO_PORT: ${CRYPTO_PORT}
       CRYPTO_HOST: crypto_service
       ENCRYPTED_GOOGLE_APP_CRED: ${ENCRYPTED_GOOGLE_APP_CRED}
+      GATEWAY_PORT: ${GATEWAY_PORT}
+      GATEWAY_HOST: gateway_service
+      SITE_DOMAIN: ${SITE_DOMAIN}
     depends_on:
       - redis
       - crypto_service
@@ -93,7 +99,7 @@ services:
       CRYPTO_HOST: crypto_service
       MSG_PORT: ${MSG_PORT}
       MSG_HOST: msg_service
-
+      SITE_DOMAIN: ${SITE_DOMAIN}
     depends_on:
       - redis
       - mongo
