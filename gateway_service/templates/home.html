@@ -104,7 +104,7 @@
         document.getElementById("login").onclick = function () {
             var auth_host = "{{auth_host}}";
             var auth_port = "{{auth_port}}";
-            location.href = "http://" + auth_host + ":" + auth_port + "/login";
+            location.href = window.location.href+ "/login";
         };
     </script> 
 </body>

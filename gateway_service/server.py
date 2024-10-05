@@ -34,9 +34,10 @@ server = Flask(__name__, template_folder='templates', static_folder='static')
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # we need redis,mongo, keywallet, jwt_handler, gridfs, requests
+site_domain = os.getenv('SITE_DOMAIN')
 auth_service_address = 'auth_service' 
 auth_service_port = os.getenv('AUTH_PORT', '5000')
-auth_service_url = f"http://{auth_service_address}:{auth_service_port}"
+auth_service_url = f"{site_domain}:{auth_service_port}"
 login_endpoint = "/login"
 refresh_endpoint = "/refresh-token"
 logout_endpoint = "/logout"
@@ -44,7 +45,7 @@ upgrade_scope_endpoint = "/upgrade-scope"
 
 msg_service_address = os.getenv('MSG_HOST', 'msg_service')
 msg_service_port = os.getenv('MSG_PORT')
-msg_service_url = f"http://{msg_service_address}:{msg_service_port}"
+msg_service_url = f"{site_domain}:{msg_service_port}"
 publish_event_endpoint = '/publish_message'
 
 def validate_tokens(f):
@@ -107,10 +108,12 @@ def validate_tokens(f):
 
 @server.route("/", methods = ["GET"])
 def home():
+    server.logger.debug(f"{home.__name__}: Home route.")
+    server.logger.debug(f"{home.__name__}: Request host: {request.host}")
+    server.logger.debug(f"{home.__name__}: Request cookies: {request.cookies}")
     jwt_token = request.cookies.get('jwt_token')
     refresh_token = request.cookies.get('refresh_token')
     unique_id = request.cookies.get('unique_id')
-    server.logger.debug(f"{home.__name__}: Home route.")
     server.logger.debug(f"{home.__name__}: JWT Token: {jwt_token if jwt_token else 'Not Found'}")
     server.logger.debug(f"{home.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
     server.logger.debug(f"{home.__name__}: Unique ID: {unique_id if unique_id else 'Not Found'}")
@@ -119,7 +122,7 @@ def home():
     if jwt_token and refresh_token and unique_id:
         server.logger.debug(f"{home.__name__}: Redirecting to main.")
         return redirect(url_for('main'))
-    return render_template("home.html", auth_host = "127.0.0.1", auth_port = auth_service_port)
+    return render_template("home.html", auth_host = site_domain+":", auth_port = auth_service_port)
 
 @server.route("/main", methods=["GET"])
 @validate_tokens
@@ -221,6 +224,7 @@ def logout():
 def login():
     server.logger.debug(f"{login.__name__}: Login route.")
     server.logger.debug(f"{login.__name__}: Request host: {request.host}")
+    server.logger.debug(f"{login.__name__}: Request cookies: {request.cookies}")
     # check for existing jwt token and refresh token validity
     jwt_token = request.cookies.get('jwt_token')
     refresh_token = request.cookies.get('refresh_token')
@@ -236,10 +240,9 @@ def login():
         if jwt_token_valid and refresh_token_valid:
             server.logger.debug(f"{login.__name__}: Login not required, tokens are valid. Redirecting to main.")
             return redirect(url_for('main'))
-    if request.host.startswith("localhost") or request.host.startswith("127.0.0.1"):
-        return redirect(f"http://127.0.0.1:5000{login_endpoint}?next=/main")
-    return redirect(auth_service_url + login_endpoint + "?next=/main")
+    server.logger.debug(f"{login.__name__}: Redirecting to auth service.")
+    return redirect(site_domain+":" + login_endpoint + "?next=/main")
 
 if __name__ == "__main__":
     server.secret_key = os.getenv('SESSION_SECRET')
-    server.run(host="0.0.0.0", port = os.getenv('GATEWAY_PORT', 8080), debug = True)
+    server.run(host="0.0.0.0", port = os.getenv('GATEWAY_PORT'), debug = True)
