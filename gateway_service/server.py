@@ -206,14 +206,16 @@ def upload():
             server.logger.debug(f"{upload.__name__} Success posting to EventQ. {response.status_code}, {response.content}")
     server.logger.debug(f"{upload.__name__} Success, exiting.")
     return Response("Success", status=200)
-    # except Exception as e:
-    #     server.logger.debug(f"{upload.__name__} Error: {str(e)}")
-    return Response(f"Error: {str(e)}", status=500)   
 
-@server.route("/consume", methods=["POST"])
-def consume():
-    # call event_service
-    pass
+@server.route("/logout", methods=["GET"])
+def logout():
+    server.logger.debug(f"{logout.__name__}: Logout route.")
+    # remove jwt token, refresh token, unique_id
+    response = make_response(redirect(url_for('home')))
+    response.set_cookie('jwt_token', '', expires=0)
+    response.set_cookie('refresh_token', '', expires=0)
+    response.set_cookie('unique_id', '', expires=0)
+    return response
 
 @server.route("/login", methods = ["GET"])
 def login():
