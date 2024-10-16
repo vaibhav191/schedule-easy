@@ -90,6 +90,7 @@ services:
     environment:
       GATEWAY_PORT: ${GATEWAY_PORT} 
       AUTH_ADDRESS: ${AUTH_ADDRESS} 
+      AUTH_HOST: auth_service
       AUTH_PORT: ${AUTH_PORT}
       MONGO_ADDRESS: mongo
       MONGO_PORT: ${MONGO_PORT}

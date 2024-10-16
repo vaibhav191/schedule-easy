@@ -35,7 +35,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s 
 
 # we need redis,mongo, keywallet, jwt_handler, gridfs, requests
 site_domain = os.getenv('SITE_DOMAIN')
-auth_service_address = 'auth_service' 
+auth_host = os.getenv('AUTH_HOST') 
 auth_service_port = os.getenv('AUTH_PORT', '5000')
 auth_service_url = f"{site_domain}:{auth_service_port}"
 login_endpoint = "/login"
@@ -45,7 +45,7 @@ upgrade_scope_endpoint = "/upgrade-scope"
 
 msg_service_address = os.getenv('MSG_HOST')
 msg_service_port = os.getenv('MSG_PORT')
-msg_service_url = f"{msg_service_address}:{msg_service_port}"
+msg_service_url = f"http://{msg_service_address}:{msg_service_port}"
 publish_event_endpoint = '/publish_message'
 
 def validate_tokens(f):
@@ -92,11 +92,10 @@ def validate_tokens(f):
             server.logger.debug(f"{wrapper.__name__}: calling refresh token endpoint: {auth_service_url + refresh_endpoint}")
             cookies = {'refresh_token': refresh_token, 'unique_id': unique_id, 'jwt_token': jwt_token}
             server.logger.debug(f"{wrapper.__name__}: Using cookies: {cookies}")
-            response = requests.post(auth_service_url + refresh_endpoint, cookies=cookies)
+            response = requests.post("http://"+auth_host +":"+ auth_service_port + refresh_endpoint, cookies=cookies)
             server.logger.debug(f"{wrapper.__name__}: Response Statuc: {response.status_code}, Refresh content: {response.content}")
             if response.status_code != 200:
                 return redirect(url_for('login'))
-
             new_jwt_token = response.cookies.get('jwt_token')
             new_refresh_token = response.cookies.get('refresh_token')
             response = make_response(redirect(url_for(f.__name__)))
