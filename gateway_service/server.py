@@ -43,15 +43,18 @@ refresh_endpoint = "/refresh-token"
 logout_endpoint = "/logout"
 upgrade_scope_endpoint = "/upgrade-scope"
 
-msg_service_address = os.getenv('MSG_HOST', 'msg_service')
+msg_service_address = os.getenv('MSG_HOST')
 msg_service_port = os.getenv('MSG_PORT')
-msg_service_url = f"{site_domain}:{msg_service_port}"
+msg_service_url = f"{msg_service_address}:{msg_service_port}"
 publish_event_endpoint = '/publish_message'
 
 def validate_tokens(f):
     def wrapper(*args, **kwargs):
         server.logger.debug(f"{validate_tokens.__name__}: Validating tokens.")
-        # check if session has jwt, refresh token, unique id
+        refresh_token = None
+        jwt_token = None
+        unique_id = None
+        # check if its a response from auth service
         server.logger.debug(f"{wrapper.__name__}: Request: {request.host}")
         refresh_token = request.cookies.get('refresh_token')
         server.logger.debug(f"{wrapper.__name__}: Refresh Token: {refresh_token[:10] if refresh_token else 'Not Found'}")
@@ -199,6 +202,7 @@ def upload():
         refresh_token = request.cookies.get('refresh_token')
         cookies = {'jwt_token': jwt_token, 'refresh_token': refresh_token, 'unique_id': unique_id}
 
+        server.logger.debug(f"{upload.__name__} Posting to EventQ, url = {msg_service_url + publish_event_endpoint}")
         response = requests.post(msg_service_url + publish_event_endpoint,
                                   json = {'message': message_b64, 'queue_name': 'eventQ'},
                                   cookies=cookies)
