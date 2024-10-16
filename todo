@@ -1,3 +1,7 @@
+[ ] - remove timezone
+[ ] - excel first example row
+[ ] - excel  calendar date and time
+[ ] - check if calendar date can be a calendar selectable popup
 [X] - Implement MongoDB handler and RedisHandler in case its not done
 [X] - Implement Encryption of Credentials then storage to MongoDB along with other necessary user data
 [ ] - Convertion Unique_id to session_id in auth_service
@@ -17,11 +21,12 @@ Future Enhancements:
 [ ] - Change simple hashing for messages to hashing using Pseudo Random Functions
 [ ] - Encrypt user's email before storing in MongoDB
 [ ] - ECC encryption instead of RSA
-[ ] - AWS Lambda?
-[ ] - AWS MessageQ?
 [ ] - CI/CD?
 [ ] - Kafka? 
 [ ] - Keys request to AWS should happen through crypto_service, and services get keys from crypto_service
 [ ] - Identify security mechanism that can be used to allow event_service consumer to send message to msg_service to publish instead of directly publishing themself
 [ ] - Implement Incremental authorization instead of full scope during login
 [ ] - Change json to pickle wherever suitable
+[ ] - Lambda
+[ ] - replace nginx with kubernetes
+[ ] - AWS SQS?
