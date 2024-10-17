@@ -99,8 +99,10 @@ NOTIFICATION_EMAIL_ID= (username)
 NOTIFICATION_EMAIL_PASSWORD= (password)
 ```
 ### NGINX
+```plaintext
 NGINX_PORT=80
 SITE_DOMAIN=https://localhost
+```
 
 ## Contributing
 
