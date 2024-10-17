@@ -34,9 +34,12 @@ services:
     image: nginx:latest
     container_name: nginx
     ports:
-      - '${NGINX_PORT}:80'
+      - '443:443'
+      - '80:80'
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf 
+      - ./selfsigned.crt:/etc/nginx/selfsigned.crt
+      - ./selfsigned.key:/etc/nginx/selfsigned.key
     depends_on:
       - gateway_service
       - auth_service
