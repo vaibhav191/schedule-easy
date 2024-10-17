@@ -22,9 +22,9 @@ To install Schedule Easy, follow these steps:
     ```sh
     cd schedule-easy
     ```
-3. Install the dependencies:
+3. Launch:
     ```sh
-    npm install
+    docker compose up -d --build
     ```
 
 ## DEPENDENCIES
@@ -98,12 +98,9 @@ MSG_PORT=
 NOTIFICATION_EMAIL_ID= (username)
 NOTIFICATION_EMAIL_PASSWORD= (password)
 ```
-
-## Usage
-To start using Schedule Easy, run the following command:
-```sh
-docker-compose up
-```
+### NGINX
+NGINX_PORT=80
+SITE_DOMAIN=https://localhost
 
 ## Contributing
 
