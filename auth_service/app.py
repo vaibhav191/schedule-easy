@@ -122,6 +122,8 @@ def callback(unique_id):
     data = rc.get(unique_id, app.logger)
     state = data.get('state')
     request_url = data.get('request_url') 
+    if not request_url or not request_url.startswith(site_domain):
+        request_url = site_domain+main_page_endpoint
     
     # scope = [Scopes.READ_EMAIL.value, Scopes.READ_PROFILE.value]    
     scope = rc.get(unique_id, app.logger).get('scopes')
@@ -202,11 +204,11 @@ def callback(unique_id):
     app.logger.debug(f"{callback.__name__}: Post ID: {post_id}")
     app.logger.debug(f"{callback.__name__}: Unique ID: {unique_id}")
     app.logger.debug(f"{callback.__name__}: request url: {request_url if request_url is not None else None}")
-    response = make_response(redirect(request_url if request_url is not None else site_domain+main_page_endpoint))
+    # To do: redirect to wherever they came from, check redis to see where they came from - request_url
+    response = make_response(redirect("/main"))
     response.set_cookie('unique_id',unique_id, httponly=True)
     response.set_cookie('jwt_token', jwt_token, httponly=True)
     response.set_cookie('refresh_token', refresh_token, httponly=True)
-
     return response
 
 @app.route('/upgrade-scope')
