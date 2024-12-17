@@ -9,6 +9,8 @@ Welcome to **Schedule Easy**, a simple and efficient scheduling tool designed to
 - **Reminders**: Set reminders for important tasks and events.
 - **Cross-Platform**: Available on multiple platforms.
 
+## Demo Video
+<iframe width="560" height="315" src="https://www.youtube.com/embed/E63U-iR2txc?si=0COFujtkXb2C87rX" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
 
 ## Installation
 
@@ -103,6 +105,12 @@ NOTIFICATION_EMAIL_PASSWORD= (password)
 NGINX_PORT=80
 SITE_DOMAIN=https://localhost
 ```
+
+## Contributors
+- Vaibhav Shrivastav (https://github.com/vaibhav191)
+    * Owner and Developer
+- Shrajal Kelkar(https://github.com/shrajalk20)
+    * Wireframes and Design
 
 ## Contributing
 
