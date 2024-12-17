@@ -29,3 +29,50 @@ class GcpService:
         email: str = next((email['value'] for email in res['emailAddresses'] if email['metadata']['primary']), None) 
 
         return email
+    
+    @staticmethod
+    def fetch_photos(credentials: Credentials):
+        # API name and version
+        API_SERVICE_NAME = 'people'
+        api_version = 'v1'
+
+        if not credentials.valid:
+            raise Exception("Invalid Credentials")        
+
+        # Service Object
+        service = build(API_SERVICE_NAME , api_version, credentials=credentials)
+        people_obj = service.people()
+        
+        # Query
+        query = people_obj.get(resourceName = 'people/me', personFields = 'photos')
+        
+        # Result
+        res: Dict[str: Any] = query.execute()
+        
+        # Fetch
+        photos = res.get('photos', None)
+
+        return photos
+    
+    def fetch_names(credentials: Credentials):
+        # API name and version
+        API_SERVICE_NAME = 'people'
+        api_version = 'v1'
+
+        if not credentials.valid:
+            raise Exception("Invalid Credentials")        
+
+        # Service Object
+        service = build(API_SERVICE_NAME , api_version, credentials=credentials)
+        people_obj = service.people()
+        
+        # Query
+        query = people_obj.get(resourceName = 'people/me', personFields = 'names')
+        
+        # Result
+        res: Dict[str: Any] = query.execute()
+        
+        # Fetch
+        names = res.get('names', None)
+
+        return names

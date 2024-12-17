@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>schedule-easy</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/style_refined.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <title>Home</title>
+    <script>
+        function changeColorDownload() {
+            // Change color of all items with id "download_button" to green
+            var download = document.getElementById("download_button");
+            // download.classList.replace('btn-primary', 'btn-success');
+            download.disabled = true;
+            download.classList.add('disabled');
+            var progress = document.getElementById("download_progress");
+            progress.style.backgroundColor = "rgba(13,110,253,0.5)";
+            // enable all items with id "select_file"
+            var element = document.getElementById("select_file");
+            element.disabled = false;
+            var label = document.getElementById("select_file_label");
+            label.classList.remove('disabled');
+            label.disabled = false;
+        }
+        function updateLabel(){
+            // once a file is selected, replace the label with the file name
+            var file = document.getElementById("select_file").files[0];
+            var label = document.getElementById("select_file_label");
+            label.innerText = file.name;
+            // label.classList.replace('btn-primary', 'btn-success');
+            label.disabled = false;
+            var progress = document.getElementById("select_progress");
+            progress.style.backgroundColor =  "rgba(13,110,253,0.5)";
+
+            // enable all items with id "sync_with_calendar"
+            var element = document.getElementById("sync_with_calendar");
+            element.disabled = false;
+        }
+        function sync() {
+            // change color of sync_with_calendar button to green
+            var sync_with_calendar = document.getElementById("sync_with_calendar");
+            // sync_with_calendar.classList.replace('btn-primary', 'btn-success');
+            sync_with_calendar.disabled = true;
+
+            var file_selector = document.getElementById("select_file_label");
+            file_selector.classList.add('disabled');
+
+            var awaiting_inputs = document.getElementById("awaiting_inputs");
+            awaiting_inputs.style.backgroundColor = "rgba(25,135,84,0.5)";
+            var progress = document.getElementById("awaiting_inputs_bar");
+            progress.style.backgroundColor = "rgba(25,135,84,0.5)";
+
+            var status = document.getElementById("status");
+            status.textContent = "Syncing Calendar";
+            // wait for 3 seconds
+            setTimeout(calendar_synced, 3000);
+        }
+
+        function calendar_synced() {
+            var syncing_calendar = document.getElementById("syncing_calendar");
+            syncing_calendar.style.backgroundColor = "rgba(25,135,84,0.5)";
+            var progress = document.getElementById("syncing_calendar_bar");
+            progress.style.backgroundColor = "rgba(25,135,84,0.5)";
+
+            var status = document.getElementById("status");
+            status.textContent = "Mailing Results";
+            // wait for 3 seconds
+            setTimeout(results_emailed, 3000);
+        }
+
+        function results_emailed() {
+            var mailing_results = document.getElementById("mailing_results");
+            mailing_results.style.backgroundColor = "rgba(25,135,84,0.5)";
+            all_tasks_completed();
+        }
+
+        function all_tasks_completed() {
+            var status = document.getElementById("status");
+            status.textContent = "All Tasks Completed!";
+        }
+    </script>
+</head>
+<body>
+    <div class="container-fluid root">
+        <!-- Navbar -->
+        <nav class="navbar border-bottom border-grey border-2">
+            <div class="container-fluid">
+            <a class="navbar-brand" href="/home.html">
+                <img src="../static/clock.png" alt="Logo" width="40" height="35" class="d-inline-block align-text-top">
+                Schedule Easy
+            </a>
+                <button class="btn btn-primary d-flex border rounded-pill" id="login" type="button" onclick="">
+                    {{email}}
+                </button>
+                <!-- <button id="logout" type="button" class="btn btn-danger" onclick="window.location.href='/logout'">
+                    Logout
+                </button> -->
+            </div>
+        </nav>
+        <!-- Main Content -->
+        <div class="container flex-grow-1 d-flex mt-5 p-0">
+            <div class="col-12">
+                <div class="row">
+                    <div class="col-lg-6 col-xl-6 col-xxl-6 col-md-12 col-sm-12">
+                        <!-- User Inputs -->
+                        <div class="col d-flex flex-column justify-content-around align-items-center mt-5">
+                            <ul class="list-group">
+                                <a href="../static/event_template_.xlsx" class="btn btn-primary border border-light rounded-pill mb-2" id="download_button" onclick="changeColorDownload()">
+                                    Download Template
+                                </a>
+                                <li class="list-group-item bg-transparent border-0 p-0 m-0 d-flex flex-row align-items-center justify-content-center mb-2" >
+                                    <div class="rectangle" id="download_progress"></div>
+                                </li >
+                                    <input type="file" id="select_file" type="submit" disabled style="display: none;" onchange="updateLabel()">
+                                    <label for="select_file" class="btn btn-primary border border-light rounded-pill mb-2 disabled" id="select_file_label" disabled>
+                                        Select Plan
+                                    </label>
+                                <li class="list-group-item bg-transparent border-0 p-0 m-0 d-flex flex-row align-items-center justify-content-center mb-2" >
+                                    <div class="rectangle" id="select_progress"></div>
+                                </li >
+                                <button class="btn btn-primary border border-light rounded-pill mb-2" type="submit" id="sync_with_calendar" disabled onclick="sync()">
+                                    Sync with Calendar
+                                </button>
+                            </ul>
+                        </div> 
+                    </div>
+                    <div class="col-lg-6 col-xl-6 col-xxl-6 col-md-12 col-sm-12 mt-3">
+                        <iframe class="youtube-player" width="560" height="315" src="https://www.youtube.com/embed/BuLod1VvR-Q?si=8Nm5vMid6E5l-RNh&autoplay=0&mute=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay mute;clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                    </div>
+                </div>
+                <div class="container row mt-5">
+                    <div class="d-flex flex-row align-items-center justify-content-around">
+                        <div class="text-center d-flex flex-column align-items-center justify-content-center">
+                            <div class="circle mb-1" id="awaiting_inputs"></div>
+                        </div>
+                        <div class="rectangle-horizontal" id="awaiting_inputs_bar"></div>
+                        <div class="text-center d-flex flex-column align-items-center justify-content-center">
+                            <div class="circle mb-1" id="syncing_calendar"></div>
+                        </div>
+                        <div class="rectangle-horizontal" id="syncing_calendar_bar"></div>
+                        <div class="text-center d-flex flex-column align-items-center justify-content-center">
+                            <div class="circle mb-1" id="mailing_results"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="container">
+                    <div class="text-center text-secondary" id="status">
+                        Awaiting Inputs
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div class="container-fluid height-footer footer ">
+            <footer class="d-flex flex-wrap justify-content-between align-items-center border-top">
+              <p class="col-md-4 mb-0 text-secondary">© 2024 Schedule Easy</p>
+              <a href="/" class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-dark text-decoration-none">
+                <svg class="bi me-2" width="40" height="32"><use xlink:href="#bootstrap"></use></svg>
+              </a>
+              <ul class="nav col-md-4 justify-content-end">
+                <li class="nav-item"><a href="#" class="nav-link px-2 text-secondary">Features</a></li>
+                <li class="nav-item"><a href="#" class="nav-link px-2 text-secondary">About</a></li>
+              </ul>
+            </footer>
+        </div>
+    </div>
+</body>
+</html>

@@ -124,7 +124,7 @@ def home():
     if jwt_token and refresh_token and unique_id:
         server.logger.debug(f"{home.__name__}: Redirecting to main.")
         return redirect(url_for('main'))
-    return render_template("home.html", auth_host = site_domain+":", auth_port = auth_service_port)
+    return render_template("home_refined.html", auth_host = site_domain+":", auth_port = auth_service_port)
 
 @server.route("/main", methods=["GET"])
 @validate_tokens
@@ -133,7 +133,7 @@ def main():
     unique_id = request.cookies.get('unique_id')
     redis_data = rc.get(unique_id, server.logger)
     server.logger.debug(f"{main.__name__}: Redis data: {redis_data if redis_data else 'Not Found'}")
-    return render_template('main.html', email = redis_data['email'])
+    return render_template('main_refined.html', email = redis_data['email'])
 
 @server.route("/download", methods=["GET"])
 @validate_tokens
