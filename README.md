@@ -11,7 +11,9 @@ Welcome to **Schedule Easy**, a simple and efficient scheduling tool designed to
 
 ## Demo Video
 
-[![Watch the video](https://img.youtube.com/vi/E63U-iR2txc/hqdefault.jpg)](https://youtu.be/E63U-iR2txc)
+![Demo Animation](demo.gif)
+
+Complete demo - https://youtu.be/E63U-iR2txc
 
 ## Installation
 
