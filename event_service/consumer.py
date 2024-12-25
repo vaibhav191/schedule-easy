@@ -18,13 +18,17 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from uuid import uuid4
 import os
+from handlers.redis_handler import RedisHandler
 from handlers.kms_handler import KMSHandler
 from handlers.mongo_handler import MongoDBHandler
 from handlers.rabbitmq_handler import RabbitMQ
 import pika # type: ignore
 import pickle
+
+
 # pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
+rc = RedisHandler()
 kms = KMSHandler()
 mongo_handler = MongoDBHandler()
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -85,6 +89,7 @@ def event_consumer(ch, method, properties, body):
         message = json.loads(message_json)
         fid = message['fid']
         email = message['email']
+        unique_id = message['unique_id'] # this is the unique id of the user used for SSE (Server Sent Events)
         fid_read = ObjectId(fid)
         # fetch cred using email id from mongo
         client = mongo_handler.get_client('auth')
@@ -123,6 +128,9 @@ def event_consumer(ch, method, properties, body):
             return
         # create_event
         df_result = create_events(cred, df)
+
+        #! event creation successful, send SSE
+        publish_update(unique_id, "Synced")
         df_result.drop(columns = [df.columns[0]], inplace = True)
         logging.debug(f"{event_consumer.__name__}: Events created, df_result: {df_result}")
         # To do - convert dataframe to dict and save in mongo db instead of saving in file
@@ -142,7 +150,8 @@ def event_consumer(ch, method, properties, body):
         # send a post request to msg_service to put this message in notificationQ
         data = {
             'fid': str(fid_results),
-            'email': email
+            'email': email,
+            'unique_id': unique_id
         }
         data_json = json.dumps(data)
         data_bytes = data_json.encode('utf-8')
@@ -190,6 +199,10 @@ def create_events(cred, df):
         df.iloc[i, status_index] = event['status']
         
     return df
+
+def publish_update(unique_id, message):
+    logging.debug(f"{publish_update.__name__}: Publishing update: {message}")
+    rc.get_client().publish(unique_id, message)
 
 if __name__ == '__main__':
     rabbitmq.consume('eventQ', event_consumer)

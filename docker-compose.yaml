@@ -153,9 +153,13 @@ services:
       CRYPTO_PORT: ${CRYPTO_PORT}
       MSG_HOST: msg_service
       MSG_PORT: ${MSG_PORT}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_HOST: redis
     depends_on:
       - rabbitmq
       - mongo
+      - redis
+      - msg_service
   
   notification_service:
     image: notification_service
@@ -178,9 +182,12 @@ services:
       MONGO_PORT: ${MONGO_PORT}
       NOTIFICATION_EMAIL_ID: ${NOTIFICATION_EMAIL_ID}
       NOTIFICATION_EMAIL_PASSWORD: ${NOTIFICATION_EMAIL_PASSWORD}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_HOST: redis
     depends_on:
       - rabbitmq
       - mongo
+      - redis
 
 volumes:
   redis-data:

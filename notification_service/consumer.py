@@ -22,6 +22,7 @@ import smtplib
 import pickle
 from handlers.mongo_handler import MongoDBHandler
 from handlers.kms_handler import KMSHandler
+from handlers.redis_handler import RedisHandler
 import pandas as pd # type: ignore
 '''
 Notification consumer will check for messages in notificationQ, once a message is found:
@@ -32,6 +33,7 @@ Notification consumer will check for messages in notificationQ, once a message i
 
 notification_email_id = os.getenv('NOTIFICATION_EMAIL_ID')
 notification_email_password = os.getenv('NOTIFICATION_EMAIL_PASSWORD')
+rc = RedisHandler()
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -86,6 +88,8 @@ def consumer(ch, method, properties, body):
     logging.debug(f"{consumer.__name__} fid: {fid if fid is not None else 'None'}")
     email_receiver = message['email']
     logging.debug(f"{consumer.__name__} email_receiver: {email_receiver if email_receiver is not None else 'None'}")
+    unique_id = message['unique_id']
+    logging.debug(f"{consumer.__name__} unique_id: {unique_id if unique_id is not None else 'None'}")
     # init mongo client
     logging.debug(f"{consumer.__name__} requesting file from mongo.")
     db = mongo_handler.get_client('results')
@@ -104,6 +108,9 @@ def consumer(ch, method, properties, body):
     # delete the file from mongo
     fs.delete(fid)
     mailer(notification_email_id, notification_email_password, email_receiver, df)
+
+    #! notification sent successfully, send SSE
+    publish_update(unique_id, "Mailed")
 
 def export_to_excel(df):
     logging.debug(f"{export_to_excel.__name__} called.")
@@ -142,6 +149,10 @@ def mailer(username, password, email_receiver, df):
     logging.debug(f"{mailer.__name__} email sent.")
     server.quit()
     logging.debug(f"{mailer.__name__} server connection closed.")
+
+def publish_update(unique_id, message):
+    logging.debug(f"{publish_update.__name__}: Publishing update: {message}")
+    rc.get_client().publish(unique_id, message)
 
 if __name__ == '__main__':
     rabbitmq.consume('notificationQ', consumer)

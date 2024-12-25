@@ -3,7 +3,7 @@
 """
 import base64
 from uuid import uuid4
-from flask import Flask, make_response, request, Response, redirect, session, render_template, send_file
+from flask import Flask, jsonify, make_response, request, Response, redirect, session, render_template, send_file
 import jwt
 import requests
 from pymongo import MongoClient
@@ -133,7 +133,8 @@ def main():
     unique_id = request.cookies.get('unique_id')
     redis_data = rc.get(unique_id, server.logger)
     server.logger.debug(f"{main.__name__}: Redis data: {redis_data if redis_data else 'Not Found'}")
-    return render_template('main_refined.html', email = redis_data['email'])
+    server.logger.debug(f"{main.__name__}: unique_id: {unique_id}") 
+    return render_template('main_refined.html', email = redis_data['email'], unique_id = unique_id)
 
 @server.route("/download", methods=["GET"])
 @validate_tokens
@@ -144,6 +145,8 @@ def download():
 @validate_tokens
 def upload():
     # try:
+    server.logger.debug(f"{upload.__name__}: Upload route.")
+    server.logger.debug(f"{upload.__name__}: Request host: {request.host}")
     # Get the uploaded file from the request
     uploaded_file = request.files.get("file")
     server.logger.debug(f"{upload.__name__}: File: {uploaded_file if uploaded_file else 'Not Found'}")
@@ -189,7 +192,8 @@ def upload():
         # generate message for eventQ
         message = {
             'fid': str(fid),
-            'email': email
+            'email': email,
+            'unique_id': unique_id
         }
         server.logger.debug(f"{upload.__name__} Message: {message}")
         message_json = json.dumps(message)
@@ -210,8 +214,13 @@ def upload():
             return Response(f"Error posting to EventQ:{response}", status = 500)
         else :
             server.logger.debug(f"{upload.__name__} Success posting to EventQ. {response.status_code}, {response.content}")
+    
+    # publish SSE
+    publish_update(unique_id, 'Uploaded')
+
     server.logger.debug(f"{upload.__name__} Success, exiting.")
-    return Response("Success", status=200)
+    # send unique_id as json response
+    return jsonify({"message": "Success", "unique_id": unique_id}), 200
 
 @server.route("/logout", methods=["GET"])
 def logout():
@@ -245,6 +254,26 @@ def login():
             return redirect(url_for('main'))
     server.logger.debug(f"{login.__name__}: Redirecting to auth service.")
     return redirect(site_domain+":" + login_endpoint + "?next=/main")
+
+# Server sent events
+@server.route("/stream/<unique_id>", methods=["GET"])
+def stream(unique_id):
+    server.logger.debug(f"{stream.__name__}: SSE route.")
+    def generate():
+        server.logger.debug(f"{generate.__name__}: Generating SSE.")
+        pubsub = rc.get_client().pubsub()
+        pubsub.subscribe(unique_id)
+        for message in pubsub.listen():
+            if message['type'] == 'message':
+                server.logger.debug(f"{generate.__name__}: Subscription message: {message}")
+                yield f"data: {message['data']}\n\n"
+            else:
+                server.logger.debug(f"{generate.__name__}: Subscription message type: {message['type']} ; message: {message}")
+    return Response(generate(), mimetype='text/event-stream')
+
+def publish_update(unique_id, message):
+    server.logger.debug(f"{publish_update.__name__}: Publishing update: {message}")
+    rc.get_client().publish(unique_id, message)
 
 if __name__ == "__main__":
     server.secret_key = os.getenv('SESSION_SECRET')
